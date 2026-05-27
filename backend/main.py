@@ -1,26 +1,49 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from services.groq_service import (
     generate_questions,
     generate_final_prompt,
-    process_prompt_scoring
+    process_prompt_scoring,
+    test_generated_prompt
 )
 
 app = FastAPI()
 
 # =========================
-# CORS
+# CORS - Robust Configuration
 # =========================
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["*"], # Keeping wildcard for dev, but will ensure it works
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Exception Handler to prevent CORS issues on 500 errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global error: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Internal Server Error", "detail": str(exc)},
+    )
 
 # =========================
 # REQUEST MODELS
@@ -38,6 +61,9 @@ class FinalPromptRequest(BaseModel):
     answers: dict
     questions: list = []
     target_ai: str = ""
+
+class TestPromptRequest(BaseModel):
+    prompt: str
 
 
 # =========================
@@ -86,3 +112,14 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
 async def score_prompt_api(data: PromptScoreRequest):
     result = process_prompt_scoring(data.prompt)
     return result
+
+# =========================
+# TEST PROMPT API
+# =========================
+
+@app.post("/test-prompt")
+async def test_prompt_api(data: TestPromptRequest):
+    response_text = test_generated_prompt(data.prompt)
+    return {
+        "response": response_text
+    }

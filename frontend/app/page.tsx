@@ -43,6 +43,40 @@ export default function Home() {
   const [loadingScore, setLoadingScore] = useState(false);
   const [scoreCopied, setScoreCopied] = useState(false);
 
+  const [testResponse, setTestResponse] = useState<string | null>(null);
+  const [loadingTest, setLoadingTest] = useState(false);
+
+  const handleTestPrompt = async () => {
+    const text =
+      finalPrompt?.smart_prompt ||
+      finalPrompt?.final_instruction ||
+      finalPrompt?.final_prompt ||
+      "";
+    
+    if (!text) return;
+
+    try {
+      setLoadingTest(true);
+      setTestResponse(null);
+      const response = await fetch("http://127.0.0.1:8000/test-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text }),
+      });
+      const data = await response.json();
+      setTestResponse(data.response);
+      // Scroll to test response
+      setTimeout(() => {
+        document.getElementById("test-response-container")?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to test prompt.");
+    } finally {
+      setLoadingTest(false);
+    }
+  };
+
   const handleScorePrompt = async () => {
     try {
       setLoadingScore(true);
@@ -926,6 +960,87 @@ export default function Home() {
                     "No prompt generated."}
                 </pre>
               </div>
+            </div>
+
+            {/* In-App Prompt Tester */}
+            <div style={{
+              marginTop: "40px",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "24px",
+              padding: "32px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                <div style={{
+                  width: "36px", height: "36px",
+                  background: "linear-gradient(135deg, #10b981, #0ea5e9)",
+                  borderRadius: "10px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "18px",
+                }}>🧪</div>
+                <div>
+                  <h2 style={{ color: "#f1f5f9", fontSize: "22px", fontWeight: 700, margin: 0 }}>
+                    In-App Prompt Tester
+                  </h2>
+                  <p style={{ color: "#64748b", fontSize: "14px", margin: "3px 0 0" }}>
+                    Test your generated prompt instantly without leaving the app
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleTestPrompt}
+                disabled={loadingTest}
+                style={{
+                  padding: "16px 32px",
+                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "14px",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  transition: "all 0.2s",
+                }}
+              >
+                {loadingTest ? (
+                  <>
+                    <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
+                    AI is thinking...
+                  </>
+                ) : (
+                  <> ⚡ Test Prompt Instantly</>
+                )}
+              </button>
+
+              {testResponse && (
+                <div id="test-response-container" style={{
+                  marginTop: "24px",
+                  background: "rgba(15, 23, 42, 0.6)",
+                  border: "1px solid rgba(16,185,129,0.3)",
+                  borderRadius: "20px",
+                  padding: "24px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }} />
+                    <span style={{ color: "#10b981", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      AI Response
+                    </span>
+                  </div>
+                  <div style={{
+                    color: "#e2e8f0",
+                    fontSize: "15px",
+                    lineHeight: "1.75",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}>
+                    {testResponse}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer Actions */}
