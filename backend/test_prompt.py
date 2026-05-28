@@ -1,5 +1,8 @@
-import requests
+from fastapi.testclient import TestClient
+from main import app
 import json
+
+client = TestClient(app)
 
 payload = {
     "user_input": "Build a personalized diet food recommendation system using machine learning",
@@ -20,7 +23,7 @@ payload = {
 }
 
 print("Calling /generate-final-prompt ...")
-r = requests.post("http://127.0.0.1:8000/generate-final-prompt", json=payload)
+r = client.post("/generate-final-prompt", json=payload)
 data = r.json()
 
 print("\n=== TITLE ===")

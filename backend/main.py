@@ -84,7 +84,7 @@ def home():
 @app.post("/generate-questions")
 async def generate_questions_api(data: UserInput):
 
-    questions = generate_questions(data.user_input)
+    questions = await generate_questions(data.user_input)
 
     return {
         "questions": questions
@@ -100,7 +100,7 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
     target_ai = data.target_ai
 
     # Generate the dynamic prompt using the imported Groq service function
-    result = generate_final_prompt(user_input, answers, questions, target_ai)
+    result = await generate_final_prompt(user_input, answers, questions, target_ai)
 
     return result
 
@@ -110,7 +110,7 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
 
 @app.post("/score-prompt")
 async def score_prompt_api(data: PromptScoreRequest):
-    result = process_prompt_scoring(data.prompt)
+    result = await process_prompt_scoring(data.prompt)
     return result
 
 # =========================
@@ -119,7 +119,7 @@ async def score_prompt_api(data: PromptScoreRequest):
 
 @app.post("/test-prompt")
 async def test_prompt_api(data: TestPromptRequest):
-    response_text = test_generated_prompt(data.prompt)
+    response_text = await test_generated_prompt(data.prompt)
     return {
         "response": response_text
     }

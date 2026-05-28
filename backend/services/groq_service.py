@@ -1,7 +1,8 @@
-from groq import Groq
+from groq import AsyncGroq
 import os
 from dotenv import load_dotenv
 import json
+import asyncio
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -9,7 +10,7 @@ from database import save_prompt_score
 
 load_dotenv()
 
-client = Groq(
+client = AsyncGroq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
@@ -50,7 +51,7 @@ def clean_json_content(content: str) -> str:
 # GENERATE QUESTIONS
 # =========================
 
-def generate_questions(user_input):
+async def generate_questions(user_input):
 
     prompt = f"""You are an expert AI Requirements Analyst.
 
@@ -64,6 +65,7 @@ CRITICAL RULES:
 2. Tailor every question to the domain. (e.g., If it's a diet plan, ask about allergies, calorie goals, cuisine preferences. If it's code, ask about tech stack, edge cases, deployment).
 3. Only use these input types: "text", "textarea", "dropdown", "radio", "checkbox".
 4. For "dropdown", "radio", and "checkbox" types, you MUST include a logical "options" array with 3-6 highly relevant choices.
+5. NOTE: A "Custom Message" option is automatically added to all "dropdown", "radio", and "checkbox" types by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
 
 Return ONLY a JSON object matching this exact schema:
 {{
@@ -81,8 +83,8 @@ Return ONLY a JSON object matching this exact schema:
 }}"""
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Switched to faster model
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=1500,
@@ -105,7 +107,7 @@ Return ONLY a JSON object matching this exact schema:
 # GENERATE FINAL PROMPT
 # =========================
 
-def generate_final_prompt(user_input, answers, questions=None, target_ai=""):
+async def generate_final_prompt(user_input, answers, questions=None, target_ai=""):
     try:
         # Build detailed Q&A context using question text if available
         qa_lines = []
@@ -120,21 +122,15 @@ def generate_final_prompt(user_input, answers, questions=None, target_ai=""):
 
         qa_context = "\n\n".join(qa_lines) if qa_lines else "(No answers provided)"
 
-        # -----------------------------------------------
-        # ITERATIVE REFINEMENT LOOP (Self-Reflection)
-        # -----------------------------------------------
-        
         # Step 1: Draft the initial version
-        draft_prompt = _build_smart_prompt_text(user_input, qa_context, target_ai)
+        draft_prompt = await _build_smart_prompt_text(user_input, qa_context, target_ai)
         
-        # Step 2: Critique the draft
-        critique = _critique_prompt(draft_prompt, user_input, qa_context)
+        # Step 2: Parallel execution of Metadata and Self-Correction
+        # This eliminates sequential waiting for metadata
+        final_prompt_task = _self_correct_prompt(draft_prompt, user_input, qa_context)
+        metadata_task = _build_metadata(user_input, qa_context, draft_prompt)
         
-        # Step 3: Refine and polish based on critique
-        final_smart_prompt = _refine_prompt(draft_prompt, critique)
-
-        # Now build the metadata JSON using a simpler call
-        meta = _build_metadata(user_input, qa_context, final_smart_prompt)
+        final_smart_prompt, meta = await asyncio.gather(final_prompt_task, metadata_task)
         
         meta["smart_prompt"] = final_smart_prompt
         
@@ -155,9 +151,9 @@ def generate_final_prompt(user_input, answers, questions=None, target_ai=""):
         }
 
 
-def _critique_prompt(draft_prompt: str, user_input: str, qa_context: str) -> str:
-    """Critique the draft prompt to find weaknesses, missing details, or areas for improvement."""
-    prompt = f"""You are a Senior Prompt Engineer. Critique the following draft prompt against the user's original intent and context.
+async def _self_correct_prompt(draft_prompt: str, user_input: str, qa_context: str) -> str:
+    """Combines critique and refinement into a single efficient step."""
+    prompt = f"""You are a Master Prompt Architect. Analyze this draft prompt against the original intent and provide a perfected version.
 
 USER ORIGINAL INTENT:
 {user_input}
@@ -168,52 +164,29 @@ USER CONTEXT:
 DRAFT PROMPT:
 {draft_prompt}
 
-List 3-5 specific, actionable improvements to make this the "best of the best" prompt. Return only the list of improvements."""
-
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Switched for reliability
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=1000
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"EXCEPTION in _critique_prompt: {str(e)}")
-        return "Improve detail and structure."
-
-
-def _refine_prompt(draft_prompt: str, critique: str) -> str:
-    """Rewrite the draft prompt incorporating the critique and expert refinements."""
-    prompt = f"""You are a Master Prompt Architect. Rewrite the draft prompt by incorporating the provided critique to create a truly flawless, high-performance master prompt.
-
-DRAFT PROMPT:
-{draft_prompt}
-
-CRITIQUE & IMPROVEMENTS:
-{critique}
-
-Final Refinement Rules:
-1. Maintain the existing headers (# Role & Persona, # Context & Background, etc.).
-2. Ensure every point in the critique is addressed.
+TASK:
+1. Identify any missing constraints or clarity issues.
+2. Rewrite the prompt to be more surgical, precise, and effective.
+3. Address specific model requirements if mentioned.
+4. DO NOT add unnecessary bloat; keep it focused on the user's objective.
 
 Write the final perfected master prompt now:"""
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Switched for reliability
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=3000
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"EXCEPTION in _refine_prompt: {str(e)}")
+        print(f"EXCEPTION in _self_correct_prompt: {str(e)}")
         return draft_prompt
 
 
-def _build_smart_prompt_text(user_input: str, qa_context: str, target_ai: str = "") -> str:
-    """Ask the LLM to write the final ready-to-use prompt as plain text using advanced frameworks."""
+async def _build_smart_prompt_text(user_input: str, qa_context: str, target_ai: str = "") -> str:
+    """Initial draft generation."""
     
     optimization_instruction = ""
     if target_ai:
@@ -240,8 +213,8 @@ Write a COMPLETE, highly detailed, ready-to-use master prompt with these headers
 Write the master prompt content now:"""
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Switched for reliability
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=2500
@@ -252,7 +225,7 @@ Write the master prompt content now:"""
         return f"Role: Expert Assistant\nContext: {user_input}\nTask: Generate a solution for {user_input}"
 
 
-def _build_metadata(user_input: str, qa_context: str, smart_prompt_text: str) -> dict:
+async def _build_metadata(user_input: str, qa_context: str, smart_prompt_text: str) -> dict:
     """Ask the LLM for compact metadata fields as JSON."""
     prompt = f"""Based on this user idea and their answers, return a small JSON object with these fields ONLY.
 
@@ -264,88 +237,67 @@ USER ANSWERS:
 Return ONLY this JSON (no markdown, no explanation):
 {{
   "title": "4-6 word title for this prompt",
-  "summary": "One sentence about what this prompt accomplishes",
-  "role": "The AI persona (one sentence starting with You are...)",
-  "context": "Brief background context (1-2 sentences)",
-  "task": "The main task in 1-2 sentences",
-  "constraints": "Key rules or limitations in 1-2 sentences",
-  "output_format": "How the output should be formatted (1 sentence)",
-  "tone": "Tone and style in 2-3 words (e.g. Professional and technical)"
+  "summary": "One sentence about what this prompt accomplishes"
 }}"""
 
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=1000
-    )
-
-    content = response.choices[0].message.content.strip()
-    print("=== METADATA RESPONSE ===")
-    print(content)
-    print("========================")
-
-    cleaned = clean_json_content(content)
-    # If the JSON response is cut off and lacks a closing brace, try to append it
-    if cleaned.startswith('{') and not cleaned.endswith('}'):
-        cleaned += '\n}'
-
     try:
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=500
+        )
+
+        content = response.choices[0].message.content.strip()
+        cleaned = clean_json_content(content)
+        if cleaned.startswith('{') and not cleaned.endswith('}'):
+            cleaned += '\n}'
+
         return json.loads(cleaned)
     except Exception as e:
         print("EXCEPTION parsing metadata:", e)
-        # Attempt manual parsing of key fields as a fallback
-        fallback = {
+        return {
             "title": "Your Smart Prompt",
-            "summary": "A detailed AI prompt based on your inputs.",
-            "role": "",
-            "context": "",
-            "task": "",
-            "constraints": "",
-            "output_format": "",
-            "tone": ""
+            "summary": "A detailed AI prompt based on your inputs."
         }
-        for key in fallback.keys():
-            import re
-            match = re.search(rf'"{key}"\s*:\s*"([^"]*?)"\s*(?:,|\n|}})', content, re.DOTALL)
-            if match:
-                fallback[key] = match.group(1).strip()
-            else:
-                match_simple = re.search(rf'"{key}"\s*:\s*"([^"]*)"', content)
-                if match_simple:
-                    fallback[key] = match_simple.group(1).strip()
-        return fallback
 
 
 # =========================
 # PROMPT SCORING FEATURE
 # =========================
 
-def score_prompt_step1(prompt: str) -> dict:
-    eval_prompt = f"""You are a world-class Prompt Engineering Auditor. 
-Evaluate the prompt out of 100 based on:
-1. Persona & Role (0-20)
-2. Task Clarity & Logic (0-20)
-3. Context & Knowledge (0-20)
-4. Guardrails & Safety (0-20)
-5. Structure & Formatting (0-20)
+async def score_prompt_step1(prompt: str) -> dict:
+    eval_prompt = f"""You are a harsh, world-class Prompt Engineering Auditor. 
+Evaluate the provided prompt out of 100 based on the following rigorous criteria. 
+Be critical: most average prompts should score between 40-60. Only truly exceptional, production-ready prompts should score above 85.
 
-Prompt: {prompt}
+CRITERIA:
+1. Persona & Role (0-20): Does it define a specific, expert persona with clear perspective?
+2. Task Clarity & Logic (0-20): Are the instructions unambiguous? Is the logic sound?
+3. Context & Knowledge (0-20): Does it provide sufficient background and reference data?
+4. Guardrails & Safety (0-20): Does it include negative constraints (what NOT to do) and edge-case handling?
+5. Structure & Formatting (0-20): Does it use clear headers, delimiters, and specify a precise output schema?
 
-Return ONLY a JSON object:
+Prompt to evaluate: 
+{prompt}
+
+Return ONLY a JSON object. Do not include any explanations outside the JSON.
 {{
   "criteria": {{
-    "Persona & Role": 18,
-    "Task Clarity & Logic": 16,
-    "Context & Knowledge": 14,
-    "Guardrails & Safety": 12,
-    "Structure & Formatting": 20
+    "Persona & Role": <score_0_to_20>,
+    "Task Clarity & Logic": <score_0_to_20>,
+    "Context & Knowledge": <score_0_to_20>,
+    "Guardrails & Safety": <score_0_to_20>,
+    "Structure & Formatting": <score_0_to_20>
   }},
-  "suggestions": ["suggestion 1", "suggestion 2"]
+  "suggestions": [
+    "Specific, actionable improvement 1",
+    "Specific, actionable improvement 2"
+  ]
 }}"""
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Reliable model
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": eval_prompt}],
             temperature=0.1,
             max_tokens=1000,
@@ -360,14 +312,14 @@ Return ONLY a JSON object:
             "suggestions": ["System temporarily unable to score prompt."]
         }
 
-def rewrite_prompt_step2(prompt: str, evaluation_json: dict) -> str:
+async def rewrite_prompt_step2(prompt: str, evaluation_json: dict) -> str:
     rewrite_prompt = f"""You are an expert AI Prompt Engineer.
 Feedback: {json.dumps(evaluation_json)}
 Original: {prompt}
 Rewrite it to be better. Return ONLY the text."""
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Reliable model
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": rewrite_prompt}],
             temperature=0.4,
             max_tokens=2000
@@ -377,13 +329,13 @@ Rewrite it to be better. Return ONLY the text."""
         print(f"EXCEPTION in rewrite_prompt_step2: {str(e)}")
         return prompt
 
-def process_prompt_scoring(prompt: str) -> dict:
+async def process_prompt_scoring(prompt: str) -> dict:
     try:
-        eval_json = score_prompt_step1(prompt)
+        eval_json = await score_prompt_step1(prompt)
         criteria = eval_json.get("criteria", {})
         suggestions = eval_json.get("suggestions", [])
         final_score = sum(criteria.values()) if isinstance(criteria, dict) else 0
-        rewritten_prompt = rewrite_prompt_step2(prompt, eval_json)
+        rewritten_prompt = await rewrite_prompt_step2(prompt, eval_json)
         
         try:
             save_prompt_score(prompt, final_score, criteria, suggestions, rewritten_prompt)
@@ -403,11 +355,11 @@ def process_prompt_scoring(prompt: str) -> dict:
 # TEST PROMPT FEATURE
 # =========================
 
-def test_generated_prompt(prompt: str) -> str:
+async def test_generated_prompt(prompt: str) -> str:
     """Sends the generated prompt to the LLM and returns its response."""
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant", # Switched to 8b to avoid rate limits
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
             max_tokens=2500

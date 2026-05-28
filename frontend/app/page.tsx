@@ -30,11 +30,11 @@ export default function Home() {
   const [userInput, setUserInput] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+  const [customAnswers, setCustomAnswers] = useState<{ [key: number]: string }>({});
   const [finalPrompt, setFinalPrompt] = useState<SmartPromptResult | null>(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [loadingPrompt, setLoadingPrompt] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [targetAi, setTargetAi] = useState("");
 
   const [activeTab, setActiveTab] = useState<"generator" | "scorer">("generator");
@@ -52,7 +52,7 @@ export default function Home() {
       finalPrompt?.final_instruction ||
       finalPrompt?.final_prompt ||
       "";
-    
+
     if (!text) return;
 
     try {
@@ -102,6 +102,7 @@ export default function Home() {
       setLoadingQuestions(true);
       setFinalPrompt(null);
       setAnswers({});
+      setCustomAnswers({});
       const response = await fetch("http://127.0.0.1:8000/generate-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,12 +121,27 @@ export default function Home() {
   const handleGenerateFinalPrompt = async () => {
     try {
       setLoadingPrompt(true);
+
+      // Merge custom answers into the answers sent to the backend
+      const processedAnswers = { ...answers };
+      Object.keys(customAnswers).forEach((key) => {
+        const idx = parseInt(key);
+        const customText = customAnswers[idx];
+        if (customText && customText.trim()) {
+          if (processedAnswers[idx] === "Custom Message") {
+            processedAnswers[idx] = customText;
+          } else if (processedAnswers[idx]?.includes("Custom Message")) {
+            processedAnswers[idx] = processedAnswers[idx].replace("Custom Message", customText);
+          }
+        }
+      });
+
       const response = await fetch("http://127.0.0.1:8000/generate-final-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_input: userInput,
-          answers,
+          answers: processedAnswers,
           questions, // send questions so backend knows each question's text
           target_ai: targetAi,
         }),
@@ -156,16 +172,7 @@ export default function Home() {
     });
   };
 
-  const sections = finalPrompt
-    ? [
-        { key: "role", label: "🎭 Role & Persona", icon: "🎭", color: "#6366f1" },
-        { key: "context", label: "📋 Context", icon: "📋", color: "#0ea5e9" },
-        { key: "task", label: "🎯 Task", icon: "🎯", color: "#10b981" },
-        { key: "constraints", label: "⚙️ Constraints", icon: "⚙️", color: "#f59e0b" },
-        { key: "output_format", label: "📄 Output Format", icon: "📄", color: "#8b5cf6" },
-        { key: "tone", label: "🎨 Tone & Style", icon: "🎨", color: "#ec4899" },
-      ]
-    : [];
+  const sections = [];
 
   return (
     <div style={{
@@ -242,7 +249,7 @@ export default function Home() {
           </p>
         </div>
 
-        
+
         {/* Tabs */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "30px" }}>
           <div style={{
@@ -361,16 +368,17 @@ export default function Home() {
                       {Object.entries(scoreResult.criteria || {}).map(([label, score]) => {
                         const numericScore = typeof score === 'number' ? score : 0;
                         return (
-                        <div key={label}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                            <span style={{ color: "#94a3b8", fontSize: "13px", textTransform: "capitalize" }}>{label.replace('_', ' ')}</span>
-                            <span style={{ color: "#e2e8f0", fontSize: "13px", fontWeight: 600 }}>{numericScore}/20</span>
+                          <div key={label}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                              <span style={{ color: "#94a3b8", fontSize: "13px", textTransform: "capitalize" }}>{label.replace('_', ' ')}</span>
+                              <span style={{ color: "#e2e8f0", fontSize: "13px", fontWeight: 600 }}>{numericScore}/20</span>
+                            </div>
+                            <div style={{ height: "6px", background: "rgba(255,255,255,0.05)", borderRadius: "3px", overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${(numericScore / 20) * 100}%`, background: "linear-gradient(90deg, #10b981, #059669)", borderRadius: "3px" }} />
+                            </div>
                           </div>
-                          <div style={{ height: "6px", background: "rgba(255,255,255,0.05)", borderRadius: "3px", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${(numericScore / 20) * 100}%`, background: "linear-gradient(90deg, #10b981, #059669)", borderRadius: "3px" }} />
-                          </div>
-                        </div>
-                      )})}
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -412,660 +420,766 @@ export default function Home() {
         {activeTab === "generator" && (
           <div id="generator-wrapper">
 
-        {/* Input Card */}
-        <div style={{
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: "24px",
-          padding: "32px",
-          marginBottom: "28px",
-          backdropFilter: "blur(10px)",
-        }}>
-          <label style={{ color: "#94a3b8", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: "12px" }}>
-            Your Idea
-          </label>
-          <textarea
-            id="user-idea-input"
-            placeholder="e.g. I want to build a SaaS landing page for a project management tool targeting remote teams..."
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            style={{
-              width: "100%",
-              height: "140px",
-              padding: "18px",
-              borderRadius: "16px",
-              border: "2px solid rgba(255,255,255,0.1)",
-              background: "rgba(255,255,255,0.04)",
-              color: "#f1f5f9",
-              fontSize: "16px",
-              outline: "none",
-              resize: "none",
-              marginBottom: "20px",
-              boxSizing: "border-box",
-              lineHeight: 1.6,
-              transition: "border-color 0.2s",
-            }}
-            onFocus={(e) => (e.target.style.borderColor = "rgba(99,102,241,0.6)")}
-            onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-          />
-          <button
-            id="generate-questions-btn"
-            onClick={handleGenerateQuestions}
-            disabled={!userInput.trim() || loadingQuestions}
-            style={{
-              padding: "16px 32px",
-              background: userInput.trim()
-                ? "linear-gradient(135deg, #6366f1, #8b5cf6)"
-                : "rgba(255,255,255,0.08)",
-              color: userInput.trim() ? "#ffffff" : "#475569",
-              border: "none",
-              borderRadius: "14px",
-              fontSize: "16px",
-              fontWeight: 700,
-              cursor: userInput.trim() ? "pointer" : "not-allowed",
-              transition: "all 0.2s",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-            }}
-          >
-            {loadingQuestions ? (
-              <>
-                <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
-                Analyzing your idea...
-              </>
-            ) : (
-              <> ✨ Generate AI Questions</>
-            )}
-          </button>
-        </div>
-
-        {/* Questions Section */}
-        {questions.length > 0 && (
-          <div style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "24px",
-            padding: "32px",
-            marginBottom: "28px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
-              <div style={{
-                width: "36px", height: "36px",
-                background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
-                borderRadius: "10px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "16px",
-              }}>❓</div>
-              <div>
-                <h2 style={{ color: "#f1f5f9", fontSize: "22px", fontWeight: 700, margin: 0 }}>
-                  AI Follow-up Questions
-                </h2>
-                <p style={{ color: "#64748b", fontSize: "13px", margin: "3px 0 0" }}>
-                  Answer these to generate a precise smart prompt
-                </p>
-              </div>
-              <div style={{
-                marginLeft: "auto",
-                background: "rgba(99,102,241,0.15)", color: "#a5b4fc",
-                border: "1px solid rgba(99,102,241,0.25)",
-                borderRadius: "20px", padding: "4px 12px", fontSize: "13px", fontWeight: 600,
-              }}>
-                {questions.length} questions
-              </div>
-            </div>
-
-            {questions.map((q, index) => (
-              <div
-                key={index}
+            {/* Input Card */}
+            <div style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "24px",
+              padding: "32px",
+              marginBottom: "28px",
+              backdropFilter: "blur(10px)",
+            }}>
+              <label style={{ color: "#94a3b8", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: "12px" }}>
+                Your Idea
+              </label>
+              <textarea
+                id="user-idea-input"
+                placeholder="e.g. I want to build a SaaS landing page for a project management tool targeting remote teams..."
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
                 style={{
-                  marginBottom: "22px",
-                  padding: "22px",
-                  background: "rgba(255,255,255,0.03)",
+                  width: "100%",
+                  height: "140px",
+                  padding: "18px",
                   borderRadius: "16px",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  border: "2px solid rgba(255,255,255,0.1)",
+                  background: "rgba(255,255,255,0.04)",
+                  color: "#f1f5f9",
+                  fontSize: "16px",
+                  outline: "none",
+                  resize: "none",
+                  marginBottom: "20px",
+                  boxSizing: "border-box",
+                  lineHeight: 1.6,
                   transition: "border-color 0.2s",
                 }}
+                onFocus={(e) => (e.target.style.borderColor = "rgba(99,102,241,0.6)")}
+                onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
+              />
+              <button
+                id="generate-questions-btn"
+                onClick={handleGenerateQuestions}
+                disabled={!userInput.trim() || loadingQuestions}
+                style={{
+                  padding: "16px 32px",
+                  background: userInput.trim()
+                    ? "linear-gradient(135deg, #6366f1, #8b5cf6)"
+                    : "rgba(255,255,255,0.08)",
+                  color: userInput.trim() ? "#ffffff" : "#475569",
+                  border: "none",
+                  borderRadius: "14px",
+                  fontSize: "16px",
+                  fontWeight: 700,
+                  cursor: userInput.trim() ? "pointer" : "not-allowed",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "14px" }}>
+                {loadingQuestions ? (
+                  <>
+                    <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
+                    Analyzing your idea...
+                  </>
+                ) : (
+                  <> Get Start!</>
+                )}
+              </button>
+            </div>
+
+            {/* Questions Section */}
+            {questions.length > 0 && (
+              <div style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "24px",
+                padding: "32px",
+                marginBottom: "28px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
                   <div style={{
-                    minWidth: "28px", height: "28px",
-                    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                    borderRadius: "8px",
+                    width: "36px", height: "36px",
+                    background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
+                    borderRadius: "10px",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "13px", fontWeight: 700, color: "#fff",
-                    marginTop: "2px",
-                  }}>
-                    {index + 1}
+                    fontSize: "16px",
+                  }}>❓</div>
+                  <div>
+                    <h2 style={{ color: "#f1f5f9", fontSize: "22px", fontWeight: 700, margin: 0 }}>
+                      AI Follow-up Questions
+                    </h2>
+                    <p style={{ color: "#64748b", fontSize: "13px", margin: "3px 0 0" }}>
+                      Answer these to generate a precise smart prompt
+                    </p>
                   </div>
-                  <p style={{ color: "#e2e8f0", fontSize: "16px", fontWeight: 600, margin: 0, lineHeight: 1.5 }}>
-                    {q.question}
-                  </p>
+                  <div style={{
+                    marginLeft: "auto",
+                    background: "rgba(99,102,241,0.15)", color: "#a5b4fc",
+                    border: "1px solid rgba(99,102,241,0.25)",
+                    borderRadius: "20px", padding: "4px 12px", fontSize: "13px", fontWeight: 600,
+                  }}>
+                    {questions.length} questions
+                  </div>
                 </div>
 
-                {/* TEXT INPUT (default fallback) */}
-                {q.type !== "textarea" &&
-                  q.type !== "text-area" &&
-                  q.type !== "paragraph" &&
-                  !((q.type === "dropdown" || q.type === "select" || q.type === "checkbox" || q.type === "radio") &&
-                    q.options && q.options.length > 0) && (
-                    <input
-                      id={`answer-${index}`}
-                      type="text"
-                      placeholder="Type your answer here..."
-                      value={answers[index] || ""}
-                      onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "14px 16px",
-                        borderRadius: "12px",
-                        border: "2px solid rgba(255,255,255,0.1)",
-                        background: "rgba(255,255,255,0.05)",
-                        color: "#f1f5f9",
-                        fontSize: "15px",
-                        outline: "none",
-                        boxSizing: "border-box",
-                        transition: "border-color 0.2s",
-                      }}
-                      onFocus={(e) => (e.target.style.borderColor = "rgba(99,102,241,0.6)")}
-                      onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-                    />
-                  )}
-
-                {/* TEXTAREA */}
-                {(q.type === "textarea" || q.type === "text-area" || q.type === "paragraph") && (
-                  <textarea
-                    id={`answer-${index}`}
-                    placeholder="Type your answer here..."
-                    value={answers[index] || ""}
-                    onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
+                {questions.map((q, index) => (
+                  <div
+                    key={index}
                     style={{
-                      display: "block",
-                      width: "100%",
-                      height: "100px",
-                      padding: "14px 16px",
-                      borderRadius: "12px",
-                      border: "2px solid rgba(255,255,255,0.1)",
-                      background: "rgba(255,255,255,0.05)",
-                      color: "#f1f5f9",
-                      fontSize: "15px",
-                      outline: "none",
-                      resize: "vertical",
-                      boxSizing: "border-box",
+                      marginBottom: "22px",
+                      padding: "22px",
+                      background: "rgba(255,255,255,0.03)",
+                      borderRadius: "16px",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      transition: "border-color 0.2s",
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "rgba(99,102,241,0.6)")}
-                    onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-                  />
-                )}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "14px" }}>
+                      <div style={{
+                        minWidth: "28px", height: "28px",
+                        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                        borderRadius: "8px",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "13px", fontWeight: 700, color: "#fff",
+                        marginTop: "2px",
+                      }}>
+                        {index + 1}
+                      </div>
+                      <p style={{ color: "#e2e8f0", fontSize: "16px", fontWeight: 600, margin: 0, lineHeight: 1.5 }}>
+                        {q.question}
+                      </p>
+                    </div>
 
-                {/* DROPDOWN */}
-                {(q.type === "dropdown" || q.type === "select") &&
-                  q.options && q.options.length > 0 && (
-                    <select
-                      id={`answer-${index}`}
-                      value={answers[index] || ""}
-                      onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "14px 16px",
-                        borderRadius: "12px",
-                        border: "2px solid rgba(255,255,255,0.1)",
-                        background: "#1e1b4b",
-                        color: "#f1f5f9",
-                        fontSize: "15px",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <option value="">Select an option...</option>
-                      {q.options.map((opt, i) => (
-                        <option key={i} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  )}
+                    {/* TEXT INPUT (default fallback) */}
+                    {q.type !== "textarea" &&
+                      q.type !== "text-area" &&
+                      q.type !== "paragraph" &&
+                      !((q.type === "dropdown" || q.type === "select" || q.type === "checkbox" || q.type === "radio") &&
+                        q.options && q.options.length > 0) && (
+                        <input
+                          id={`answer-${index}`}
+                          type="text"
+                          placeholder="Type your answer here..."
+                          value={answers[index] || ""}
+                          onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            padding: "14px 16px",
+                            borderRadius: "12px",
+                            border: "2px solid rgba(255,255,255,0.1)",
+                            background: "rgba(255,255,255,0.05)",
+                            color: "#f1f5f9",
+                            fontSize: "15px",
+                            outline: "none",
+                            boxSizing: "border-box",
+                            transition: "border-color 0.2s",
+                          }}
+                          onFocus={(e) => (e.target.style.borderColor = "rgba(99,102,241,0.6)")}
+                          onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
+                        />
+                      )}
 
-                {/* CHECKBOX */}
-                {q.type === "checkbox" && q.options && q.options.length > 0 && (
-                  <div style={{ marginTop: "4px" }}>
-                    {q.options.map((option, i) => {
-                      const current = answers[index]?.split(", ").filter(Boolean) || [];
-                      const checked = current.includes(option);
-                      return (
-                        <label key={i} style={{
+                    {/* TEXTAREA */}
+                    {(q.type === "textarea" || q.type === "text-area" || q.type === "paragraph") && (
+                      <textarea
+                        id={`answer-${index}`}
+                        placeholder="Type your answer here..."
+                        value={answers[index] || ""}
+                        onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          height: "100px",
+                          padding: "14px 16px",
+                          borderRadius: "12px",
+                          border: "2px solid rgba(255,255,255,0.1)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#f1f5f9",
+                          fontSize: "15px",
+                          outline: "none",
+                          resize: "vertical",
+                          boxSizing: "border-box",
+                        }}
+                        onFocus={(e) => (e.target.style.borderColor = "rgba(99,102,241,0.6)")}
+                        onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
+                      />
+                    )}
+
+                    {/* DROPDOWN */}
+                    {(q.type === "dropdown" || q.type === "select") &&
+                      q.options && q.options.length > 0 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                          <select
+                            id={`answer-${index}`}
+                            value={answers[index] || ""}
+                            onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              padding: "14px 16px",
+                              borderRadius: "12px",
+                              border: "2px solid rgba(255,255,255,0.1)",
+                              background: "#1e1b4b",
+                              color: "#f1f5f9",
+                              fontSize: "15px",
+                              outline: "none",
+                              boxSizing: "border-box",
+                            }}
+                          >
+                            <option value="">Select an option...</option>
+                            {q.options.map((opt, i) => (
+                              <option key={i} value={opt}>{opt}</option>
+                            ))}
+                            <option value="Custom Message">Custom Message...</option>
+                          </select>
+
+                          {answers[index] === "Custom Message" && (
+                            <input
+                              type="text"
+                              placeholder="Type your custom message here..."
+                              value={customAnswers[index] || ""}
+                              onChange={(e) => setCustomAnswers({ ...customAnswers, [index]: e.target.value })}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                padding: "14px 16px",
+                                borderRadius: "12px",
+                                border: "2px solid rgba(99,102,241,0.4)",
+                                background: "rgba(99,102,241,0.05)",
+                                color: "#f1f5f9",
+                                fontSize: "15px",
+                                outline: "none",
+                                boxSizing: "border-box",
+                                animation: "fadeIn 0.3s ease-out",
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
+
+                    {/* CHECKBOX */}
+                    {q.type === "checkbox" && q.options && q.options.length > 0 && (
+                      <div style={{ marginTop: "4px" }}>
+                        {q.options.map((option, i) => {
+                          const current = answers[index]?.split(", ").filter(Boolean) || [];
+                          const checked = current.includes(option);
+                          return (
+                            <label key={i} style={{
+                              display: "flex", alignItems: "center",
+                              gap: "12px", marginBottom: "10px",
+                              color: "#cbd5e1", fontSize: "15px", cursor: "pointer",
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const updated = e.target.checked
+                                    ? [...current, option]
+                                    : current.filter((x) => x !== option);
+                                  setAnswers({ ...answers, [index]: updated.join(", ") });
+                                }}
+                                style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#6366f1" }}
+                              />
+                              {option}
+                            </label>
+                          );
+                        })}
+                        {/* Custom Message Checkbox */}
+                        <label style={{
                           display: "flex", alignItems: "center",
                           gap: "12px", marginBottom: "10px",
                           color: "#cbd5e1", fontSize: "15px", cursor: "pointer",
                         }}>
                           <input
                             type="checkbox"
-                            checked={checked}
+                            checked={(answers[index]?.split(", ").filter(Boolean) || []).includes("Custom Message")}
                             onChange={(e) => {
+                              const current = answers[index]?.split(", ").filter(Boolean) || [];
                               const updated = e.target.checked
-                                ? [...current, option]
-                                : current.filter((x) => x !== option);
+                                ? [...current, "Custom Message"]
+                                : current.filter((x) => x !== "Custom Message");
                               setAnswers({ ...answers, [index]: updated.join(", ") });
                             }}
                             style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#6366f1" }}
                           />
-                          {option}
+                          Custom Message
                         </label>
+
+                        {(answers[index]?.split(", ").filter(Boolean) || []).includes("Custom Message") && (
+                          <input
+                            type="text"
+                            placeholder="Type your custom message here..."
+                            value={customAnswers[index] || ""}
+                            onChange={(e) => setCustomAnswers({ ...customAnswers, [index]: e.target.value })}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              padding: "14px 16px",
+                              borderRadius: "12px",
+                              border: "2px solid rgba(99,102,241,0.4)",
+                              background: "rgba(99,102,241,0.05)",
+                              color: "#f1f5f9",
+                              fontSize: "15px",
+                              outline: "none",
+                              boxSizing: "border-box",
+                              marginTop: "8px",
+                              animation: "fadeIn 0.3s ease-out",
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* RADIO */}
+                    {q.type === "radio" && q.options && q.options.length > 0 && (
+                      <div style={{ marginTop: "4px" }}>
+                        {q.options.map((option, i) => (
+                          <label key={i} style={{
+                            display: "flex", alignItems: "center",
+                            gap: "12px", marginBottom: "10px",
+                            color: "#cbd5e1", fontSize: "15px", cursor: "pointer",
+                          }}>
+                            <input
+                              type="radio"
+                              name={`question-${index}`}
+                              checked={answers[index] === option}
+                              onChange={() => setAnswers({ ...answers, [index]: option })}
+                              style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#6366f1" }}
+                            />
+                            {option}
+                          </label>
+                        ))}
+                        {/* Custom Message Radio */}
+                        <label style={{
+                          display: "flex", alignItems: "center",
+                          gap: "12px", marginBottom: "10px",
+                          color: "#cbd5e1", fontSize: "15px", cursor: "pointer",
+                        }}>
+                          <input
+                            type="radio"
+                            name={`question-${index}`}
+                            checked={answers[index] === "Custom Message"}
+                            onChange={() => setAnswers({ ...answers, [index]: "Custom Message" })}
+                            style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#6366f1" }}
+                          />
+                          Custom Message
+                        </label>
+
+                        {answers[index] === "Custom Message" && (
+                          <input
+                            type="text"
+                            placeholder="Type your custom message here..."
+                            value={customAnswers[index] || ""}
+                            onChange={(e) => setCustomAnswers({ ...customAnswers, [index]: e.target.value })}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              padding: "14px 16px",
+                              borderRadius: "12px",
+                              border: "2px solid rgba(99,102,241,0.4)",
+                              background: "rgba(99,102,241,0.05)",
+                              color: "#f1f5f9",
+                              fontSize: "15px",
+                              outline: "none",
+                              boxSizing: "border-box",
+                              marginTop: "8px",
+                              animation: "fadeIn 0.3s ease-out",
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Target AI Selection */}
+                <div style={{ marginTop: "20px", marginBottom: "15px" }}>
+                  <label style={{ display: "block", color: "#94a3b8", fontSize: "14px", fontWeight: 600, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Target AI Model (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ChatGPT, Claude, Gemini..."
+                    value={targetAi}
+                    onChange={(e) => setTargetAi(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "14px 18px",
+                      background: "rgba(15, 23, 42, 0.6)",
+                      border: "1px solid rgba(99, 102, 241, 0.2)",
+                      borderRadius: "12px",
+                      color: "#f8fafc",
+                      fontSize: "15px",
+                      outline: "none",
+                      transition: "border-color 0.2s",
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "rgba(99, 102, 241, 0.5)"}
+                    onBlur={(e) => e.target.style.borderColor = "rgba(99, 102, 241, 0.2)"}
+                  />
+                  <p style={{ color: "#64748b", fontSize: "12px", marginTop: "6px" }}>
+                    Optimizes the prompt for a specific model's strengths.
+                  </p>
+                </div>
+
+                {/* Generate Prompt Button */}
+                <button
+                  id="generate-prompt-btn"
+                  onClick={handleGenerateFinalPrompt}
+                  disabled={loadingPrompt}
+                  style={{
+                    marginTop: "12px",
+                    padding: "18px 36px",
+                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "14px",
+                    fontSize: "17px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    boxShadow: "0 8px 30px rgba(16,185,129,0.3)",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {loadingPrompt ? (
+                    <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Building your Smart Prompt...</>
+                  ) : (
+                    <> 🚀 Generate Smart Prompt</>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* ===== SMART PROMPT RESULT ===== */}
+            {finalPrompt && (
+              <div id="smart-prompt-result" style={{ marginTop: "10px" }}>
+
+                {/* Result Header */}
+                <div style={{
+                  background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))",
+                  border: "1px solid rgba(99,102,241,0.3)",
+                  borderRadius: "24px",
+                  padding: "32px",
+                  marginBottom: "20px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "20px", flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{
+                        display: "inline-flex", alignItems: "center", gap: "8px",
+                        background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
+                        borderRadius: "20px", padding: "5px 14px",
+                        fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px",
+                        marginBottom: "14px",
+                      }}>
+                        ✅ Smart Prompt Generated
+                      </div>
+                      <h2 style={{
+                        color: "#f1f5f9", fontSize: "28px", fontWeight: 800,
+                        margin: "0 0 10px", lineHeight: 1.2,
+                      }}>
+                        {finalPrompt.title || "Your Smart Prompt"}
+                      </h2>
+                      {finalPrompt.summary && (
+                        <p style={{ color: "#94a3b8", fontSize: "15px", margin: 0, lineHeight: 1.6, maxWidth: "600px" }}>
+                          {finalPrompt.summary}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Best Score Badge removed as requested */}
+                  </div>
+                </div>
+
+                {/* Quality Analysis Details removed as requested */}
+
+                {/* Platform Selection - DIRECT OPEN */}
+                <div style={{
+                  background: "rgba(99, 102, 241, 0.1)",
+                  border: "1px solid rgba(99, 102, 241, 0.2)",
+                  borderRadius: "24px",
+                  padding: "24px",
+                  marginBottom: "20px",
+                  textAlign: "center"
+                }}>
+                  <h3 style={{ color: "#f1f5f9", fontSize: "18px", fontWeight: 700, marginBottom: "16px" }}>
+                    🚀 Use with Your Preferred AI
+                  </h3>
+                  <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+                    {[
+                      { name: "ChatGPT", icon: "🤖", url: "https://chatgpt.com/?q=", color: "#10a37f" },
+                      { name: "Claude", icon: "🧠", url: "https://claude.ai/new?q=", color: "#d97757" },
+                      { name: "Gemini", icon: "✨", url: "https://gemini.google.com/app", color: "#1a73e8" },
+                    ].map((tool) => (
+                      <button
+                        key={tool.name}
+                        onClick={() => {
+                          const text = finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "";
+                          navigator.clipboard.writeText(text);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2500);
+
+                          let finalUrl = tool.url;
+                          if (tool.name !== "Gemini" && text.length < 2000) {
+                            finalUrl += encodeURIComponent(text);
+                          }
+                          window.open(finalUrl, "_blank");
+                        }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "10px",
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "14px",
+                          padding: "12px 20px",
+                          color: "#fff",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          fontSize: "15px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span style={{ fontSize: "20px" }}>{tool.icon}</span>
+                        Open in {tool.name}
+                      </button>
+                    ))}
+                  </div>
+                  <p style={{ color: "#64748b", fontSize: "12px", marginTop: "12px" }}>
+                    Clicking a button will copy the prompt and open the AI platform.
+                  </p>
+                </div>
+
+                {/* Metadata Sections Grid */}
+                {sections.some(s => finalPrompt[s.key as keyof SmartPromptResult]) && (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                    gap: "16px",
+                    marginBottom: "20px",
+                  }}>
+                    {sections.map(({ key, label, icon, color }) => {
+                      const value = finalPrompt[key as keyof SmartPromptResult];
+                      if (!value) return null;
+                      const isActive = activeSection === key;
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => setActiveSection(isActive ? null : key)}
+                          style={{
+                            background: "rgba(255,255,255,0.04)",
+                            border: `1px solid ${isActive ? color + "60" : "rgba(255,255,255,0.08)"}`,
+                            borderRadius: "16px",
+                            padding: "20px",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            boxShadow: isActive ? `0 0 20px ${color}20` : "none",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: isActive ? "12px" : "0" }}>
+                            <div style={{
+                              width: "32px", height: "32px",
+                              background: color + "20",
+                              borderRadius: "8px",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "14px", border: `1px solid ${color}40`,
+                            }}>{icon}</div>
+                            <span style={{ color: "#e2e8f0", fontWeight: 600, fontSize: "14px" }}>
+                              {label.replace(/^.+ /, "")}
+                            </span>
+                            <span style={{
+                              marginLeft: "auto", color: "#475569", fontSize: "12px",
+                              transform: isActive ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s",
+                            }}>▼</span>
+                          </div>
+                          {isActive && (
+                            <p style={{
+                              color: "#94a3b8", fontSize: "14px", margin: 0,
+                              lineHeight: 1.7, paddingTop: "4px",
+                              borderTop: "1px solid rgba(255,255,255,0.06)",
+                            }}>
+                              {value as string}
+                            </p>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
                 )}
 
-                {/* RADIO */}
-                {q.type === "radio" && q.options && q.options.length > 0 && (
-                  <div style={{ marginTop: "4px" }}>
-                    {q.options.map((option, i) => (
-                      <label key={i} style={{
-                        display: "flex", alignItems: "center",
-                        gap: "12px", marginBottom: "10px",
-                        color: "#cbd5e1", fontSize: "15px", cursor: "pointer",
-                      }}>
-                        <input
-                          type="radio"
-                          name={`question-${index}`}
-                          checked={answers[index] === option}
-                          onChange={() => setAnswers({ ...answers, [index]: option })}
-                          style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#6366f1" }}
-                        />
-                        {option}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Target AI Selection */}
-            <div style={{ marginTop: "20px", marginBottom: "15px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "14px", fontWeight: 600, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Target AI Model (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. ChatGPT, Claude, Gemini..."
-                value={targetAi}
-                onChange={(e) => setTargetAi(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "14px 18px",
-                  background: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(99, 102, 241, 0.2)",
-                  borderRadius: "12px",
-                  color: "#f8fafc",
-                  fontSize: "15px",
-                  outline: "none",
-                  transition: "border-color 0.2s",
-                }}
-                onFocus={(e) => e.target.style.borderColor = "rgba(99, 102, 241, 0.5)"}
-                onBlur={(e) => e.target.style.borderColor = "rgba(99, 102, 241, 0.2)"}
-              />
-              <p style={{ color: "#64748b", fontSize: "12px", marginTop: "6px" }}>
-                Optimizes the prompt for a specific model's strengths.
-              </p>
-            </div>
-
-            {/* Generate Prompt Button */}
-            <button
-              id="generate-prompt-btn"
-              onClick={handleGenerateFinalPrompt}
-              disabled={loadingPrompt}
-              style={{
-                marginTop: "12px",
-                padding: "18px 36px",
-                background: "linear-gradient(135deg, #10b981, #059669)",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "14px",
-                fontSize: "17px",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                boxShadow: "0 8px 30px rgba(16,185,129,0.3)",
-                transition: "all 0.2s",
-              }}
-            >
-              {loadingPrompt ? (
-                <><span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> Building your Smart Prompt...</>
-              ) : (
-                <> 🚀 Generate Smart Prompt</>
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* ===== SMART PROMPT RESULT ===== */}
-        {finalPrompt && (
-          <div id="smart-prompt-result" style={{ marginTop: "10px" }}>
-
-            {/* Result Header */}
-            <div style={{
-              background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))",
-              border: "1px solid rgba(99,102,241,0.3)",
-              borderRadius: "24px",
-              padding: "32px",
-              marginBottom: "20px",
-            }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "20px", flexWrap: "wrap" }}>
-                <div>
+                {/* The Big Smart Prompt */}
+                <div style={{
+                  background: "rgba(15, 23, 42, 0.8)",
+                  border: "1px solid rgba(99,102,241,0.4)",
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  boxShadow: "0 25px 60px rgba(0,0,0,0.4)",
+                }}>
+                  {/* Prompt toolbar */}
                   <div style={{
-                    display: "inline-flex", alignItems: "center", gap: "8px",
-                    background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
-                    borderRadius: "20px", padding: "5px 14px",
-                    fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px",
-                    marginBottom: "14px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "16px 24px",
+                    background: "rgba(99,102,241,0.1)",
+                    borderBottom: "1px solid rgba(99,102,241,0.2)",
                   }}>
-                    ✅ Smart Prompt Generated
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ff5f57" }} />
+                        <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#febc2e" }} />
+                        <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#28c840" }} />
+                      </div>
+                      <span style={{ color: "#64748b", fontSize: "13px", marginLeft: "8px" }}>
+                        smart-prompt.txt
+                      </span>
+                    </div>
+                    <button
+                      id="copy-prompt-btn"
+                      onClick={handleCopy}
+                      style={{
+                        padding: "8px 18px",
+                        background: copied
+                          ? "linear-gradient(135deg, #10b981, #059669)"
+                          : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "7px",
+                        transition: "all 0.3s",
+                      }}
+                    >
+                      {copied ? "✅ Copied!" : "📋 Copy Prompt"}
+                    </button>
                   </div>
-                  <h2 style={{
-                    color: "#f1f5f9", fontSize: "28px", fontWeight: 800,
-                    margin: "0 0 10px", lineHeight: 1.2,
-                  }}>
-                    {finalPrompt.title || "Your Smart Prompt"}
-                  </h2>
-                  {finalPrompt.summary && (
-                    <p style={{ color: "#94a3b8", fontSize: "15px", margin: 0, lineHeight: 1.6, maxWidth: "600px" }}>
-                      {finalPrompt.summary}
-                    </p>
+
+                  {/* Prompt Content */}
+                  <div style={{ padding: "28px 32px" }}>
+                    <pre style={{
+                      color: "#e2e8f0",
+                      fontSize: "15px",
+                      lineHeight: "1.85",
+                      margin: 0,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                    }}>
+                      {finalPrompt.smart_prompt ||
+                        finalPrompt.final_instruction ||
+                        finalPrompt.final_prompt ||
+                        "No prompt generated."}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* In-App Prompt Tester */}
+                <div style={{
+                  marginTop: "40px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "24px",
+                  padding: "32px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                    <div style={{
+                      width: "36px", height: "36px",
+                      background: "linear-gradient(135deg, #10b981, #0ea5e9)",
+                      borderRadius: "10px",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "18px",
+                    }}>🧪</div>
+                    <div>
+                      <h2 style={{ color: "#f1f5f9", fontSize: "22px", fontWeight: 700, margin: 0 }}>
+                        In-App Prompt Tester
+                      </h2>
+                      <p style={{ color: "#64748b", fontSize: "14px", margin: "3px 0 0" }}>
+                        Test your generated prompt instantly without leaving the app
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleTestPrompt}
+                    disabled={loadingTest}
+                    style={{
+                      padding: "16px 32px",
+                      background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "14px",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {loadingTest ? (
+                      <>
+                        <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
+                        AI is thinking...
+                      </>
+                    ) : (
+                      <> ⚡ Test Prompt Instantly</>
+                    )}
+                  </button>
+
+                  {testResponse && (
+                    <div id="test-response-container" style={{
+                      marginTop: "24px",
+                      background: "rgba(15, 23, 42, 0.6)",
+                      border: "1px solid rgba(16,185,129,0.3)",
+                      borderRadius: "20px",
+                      padding: "24px",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }} />
+                        <span style={{ color: "#10b981", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          AI Response
+                        </span>
+                      </div>
+                      <div style={{
+                        color: "#e2e8f0",
+                        fontSize: "15px",
+                        lineHeight: "1.75",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}>
+                        {testResponse}
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {/* Best Score Badge removed as requested */}
-              </div>
-            </div>
-
-            {/* Quality Analysis Details removed as requested */}
-
-            {/* Platform Selection - DIRECT OPEN */}
-            <div style={{
-              background: "rgba(99, 102, 241, 0.1)",
-              border: "1px solid rgba(99, 102, 241, 0.2)",
-              borderRadius: "24px",
-              padding: "24px",
-              marginBottom: "20px",
-              textAlign: "center"
-            }}>
-              <h3 style={{ color: "#f1f5f9", fontSize: "18px", fontWeight: 700, marginBottom: "16px" }}>
-                🚀 Use with Your Preferred AI
-              </h3>
-              <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-                {[
-                  { name: "ChatGPT", icon: "🤖", url: "https://chatgpt.com/?q=", color: "#10a37f" },
-                  { name: "Claude", icon: "🧠", url: "https://claude.ai/new?q=", color: "#d97757" },
-                  { name: "Gemini", icon: "✨", url: "https://gemini.google.com/app", color: "#1a73e8" },
-                ].map((tool) => (
+                {/* Footer Actions */}
+                <div style={{
+                  marginTop: "30px",
+                  display: "flex", justifyContent: "center",
+                }}>
                   <button
-                    key={tool.name}
-                    onClick={() => {
-                      const text = finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "";
-                      navigator.clipboard.writeText(text);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2500);
-                      
-                      let finalUrl = tool.url;
-                      if (tool.name !== "Gemini" && text.length < 2000) {
-                        finalUrl += encodeURIComponent(text);
-                      }
-                      window.open(finalUrl, "_blank");
-                    }}
+                    onClick={() => { setQuestions([]); setFinalPrompt(null); setAnswers({}); setUserInput(""); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     style={{
                       display: "flex", alignItems: "center", gap: "10px",
-                      background: "rgba(255,255,255,0.05)",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "rgba(239,68,68,0.1)",
+                      border: "1px solid rgba(239,68,68,0.2)",
                       borderRadius: "14px",
-                      padding: "12px 20px",
-                      color: "#fff",
-                      cursor: "pointer",
+                      padding: "14px 28px",
+                      color: "#f87171", fontSize: "15px",
+                      cursor: "pointer", fontWeight: 700,
                       transition: "all 0.2s",
-                      fontSize: "15px",
-                      fontWeight: 600,
                     }}
                   >
-                    <span style={{ fontSize: "20px" }}>{tool.icon}</span>
-                    Open in {tool.name}
+                    🔄 Create Another Smart Prompt
                   </button>
-                ))}
-              </div>
-              <p style={{ color: "#64748b", fontSize: "12px", marginTop: "12px" }}>
-                Clicking a button will copy the prompt and open the AI platform.
-              </p>
-            </div>
-
-            {/* Metadata Sections Grid */}
-            {sections.some(s => finalPrompt[s.key as keyof SmartPromptResult]) && (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: "16px",
-                marginBottom: "20px",
-              }}>
-                {sections.map(({ key, label, icon, color }) => {
-                  const value = finalPrompt[key as keyof SmartPromptResult];
-                  if (!value) return null;
-                  const isActive = activeSection === key;
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => setActiveSection(isActive ? null : key)}
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: `1px solid ${isActive ? color + "60" : "rgba(255,255,255,0.08)"}`,
-                        borderRadius: "16px",
-                        padding: "20px",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        boxShadow: isActive ? `0 0 20px ${color}20` : "none",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: isActive ? "12px" : "0" }}>
-                        <div style={{
-                          width: "32px", height: "32px",
-                          background: color + "20",
-                          borderRadius: "8px",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "14px", border: `1px solid ${color}40`,
-                        }}>{icon}</div>
-                        <span style={{ color: "#e2e8f0", fontWeight: 600, fontSize: "14px" }}>
-                          {label.replace(/^.+ /, "")}
-                        </span>
-                        <span style={{
-                          marginLeft: "auto", color: "#475569", fontSize: "12px",
-                          transform: isActive ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s",
-                        }}>▼</span>
-                      </div>
-                      {isActive && (
-                        <p style={{
-                          color: "#94a3b8", fontSize: "14px", margin: 0,
-                          lineHeight: 1.7, paddingTop: "4px",
-                          borderTop: "1px solid rgba(255,255,255,0.06)",
-                        }}>
-                          {value as string}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                </div>
               </div>
             )}
-
-            {/* The Big Smart Prompt */}
-            <div style={{
-              background: "rgba(15, 23, 42, 0.8)",
-              border: "1px solid rgba(99,102,241,0.4)",
-              borderRadius: "20px",
-              overflow: "hidden",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.4)",
-            }}>
-              {/* Prompt toolbar */}
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "16px 24px",
-                background: "rgba(99,102,241,0.1)",
-                borderBottom: "1px solid rgba(99,102,241,0.2)",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ff5f57" }} />
-                    <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#febc2e" }} />
-                    <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#28c840" }} />
-                  </div>
-                  <span style={{ color: "#64748b", fontSize: "13px", marginLeft: "8px" }}>
-                    smart-prompt.txt
-                  </span>
-                </div>
-                <button
-                  id="copy-prompt-btn"
-                  onClick={handleCopy}
-                  style={{
-                    padding: "8px 18px",
-                    background: copied
-                      ? "linear-gradient(135deg, #10b981, #059669)"
-                      : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "10px",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "7px",
-                    transition: "all 0.3s",
-                  }}
-                >
-                  {copied ? "✅ Copied!" : "📋 Copy Prompt"}
-                </button>
-              </div>
-
-              {/* Prompt Content */}
-              <div style={{ padding: "28px 32px" }}>
-                <pre style={{
-                  color: "#e2e8f0",
-                  fontSize: "15px",
-                  lineHeight: "1.85",
-                  margin: 0,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  fontFamily: "'Inter', 'Segoe UI', sans-serif",
-                }}>
-                  {finalPrompt.smart_prompt ||
-                    finalPrompt.final_instruction ||
-                    finalPrompt.final_prompt ||
-                    "No prompt generated."}
-                </pre>
-              </div>
-            </div>
-
-            {/* In-App Prompt Tester */}
-            <div style={{
-              marginTop: "40px",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "24px",
-              padding: "32px",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                <div style={{
-                  width: "36px", height: "36px",
-                  background: "linear-gradient(135deg, #10b981, #0ea5e9)",
-                  borderRadius: "10px",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "18px",
-                }}>🧪</div>
-                <div>
-                  <h2 style={{ color: "#f1f5f9", fontSize: "22px", fontWeight: 700, margin: 0 }}>
-                    In-App Prompt Tester
-                  </h2>
-                  <p style={{ color: "#64748b", fontSize: "14px", margin: "3px 0 0" }}>
-                    Test your generated prompt instantly without leaving the app
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={handleTestPrompt}
-                disabled={loadingTest}
-                style={{
-                  padding: "16px 32px",
-                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "14px",
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  transition: "all 0.2s",
-                }}
-              >
-                {loadingTest ? (
-                  <>
-                    <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
-                    AI is thinking...
-                  </>
-                ) : (
-                  <> ⚡ Test Prompt Instantly</>
-                )}
-              </button>
-
-              {testResponse && (
-                <div id="test-response-container" style={{
-                  marginTop: "24px",
-                  background: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(16,185,129,0.3)",
-                  borderRadius: "20px",
-                  padding: "24px",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }} />
-                    <span style={{ color: "#10b981", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                      AI Response
-                    </span>
-                  </div>
-                  <div style={{
-                    color: "#e2e8f0",
-                    fontSize: "15px",
-                    lineHeight: "1.75",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}>
-                    {testResponse}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Actions */}
-            <div style={{
-              marginTop: "30px",
-              display: "flex", justifyContent: "center",
-            }}>
-              <button
-                onClick={() => { setQuestions([]); setFinalPrompt(null); setAnswers({}); setUserInput(""); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: "10px",
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.2)",
-                  borderRadius: "14px",
-                  padding: "14px 28px",
-                  color: "#f87171", fontSize: "15px",
-                  cursor: "pointer", fontWeight: 700,
-                  transition: "all 0.2s",
-                }}
-              >
-                🔄 Create Another Smart Prompt
-              </button>
-            </div>
-          </div>
-        )}
           </div>
         )}
       </div>
@@ -1075,6 +1189,7 @@ export default function Home() {
         * { box-sizing: border-box; }
         ::placeholder { color: #475569 !important; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
         ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 4px; }
