@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type Question = {
   question: string;
@@ -18,6 +18,7 @@ type SmartPromptResult = {
   output_format?: string;
   tone?: string;
   smart_prompt?: string;
+  score?: number;
   quality_score?: number;
   quality_breakdown?: { [key: string]: number };
   quality_feedback?: string[];
@@ -37,14 +38,56 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [targetAi, setTargetAi] = useState("");
 
-  const [activeTab, setActiveTab] = useState<"generator" | "scorer">("generator");
-  const [scoreInput, setScoreInput] = useState("");
-  const [scoreResult, setScoreResult] = useState<any>(null);
-  const [loadingScore, setLoadingScore] = useState(false);
-  const [scoreCopied, setScoreCopied] = useState(false);
-
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(false);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedUserInput = localStorage.getItem("userInput");
+    const savedQuestions = localStorage.getItem("questions");
+    const savedAnswers = localStorage.getItem("answers");
+    const savedCustomAnswers = localStorage.getItem("customAnswers");
+    const savedFinalPrompt = localStorage.getItem("finalPrompt");
+    const savedTargetAi = localStorage.getItem("targetAi");
+    const savedTestResponse = localStorage.getItem("testResponse");
+
+    if (savedUserInput) setUserInput(savedUserInput);
+    if (savedQuestions) setQuestions(JSON.parse(savedQuestions));
+    if (savedAnswers) setAnswers(JSON.parse(savedAnswers));
+    if (savedCustomAnswers) setCustomAnswers(JSON.parse(savedCustomAnswers));
+    if (savedFinalPrompt) setFinalPrompt(JSON.parse(savedFinalPrompt));
+    if (savedTargetAi) setTargetAi(savedTargetAi);
+    if (savedTestResponse) setTestResponse(savedTestResponse);
+  }, []);
+
+  // Save to localStorage whenever state changes
+  useEffect(() => {
+    if (userInput) localStorage.setItem("userInput", userInput);
+  }, [userInput]);
+
+  useEffect(() => {
+    if (questions.length > 0) localStorage.setItem("questions", JSON.stringify(questions));
+  }, [questions]);
+
+  useEffect(() => {
+    if (Object.keys(answers).length > 0) localStorage.setItem("answers", JSON.stringify(answers));
+  }, [answers]);
+
+  useEffect(() => {
+    if (Object.keys(customAnswers).length > 0) localStorage.setItem("customAnswers", JSON.stringify(customAnswers));
+  }, [customAnswers]);
+
+  useEffect(() => {
+    if (finalPrompt) localStorage.setItem("finalPrompt", JSON.stringify(finalPrompt));
+  }, [finalPrompt]);
+
+  useEffect(() => {
+    if (targetAi) localStorage.setItem("targetAi", targetAi);
+  }, [targetAi]);
+
+  useEffect(() => {
+    if (testResponse) localStorage.setItem("testResponse", testResponse);
+  }, [testResponse]);
 
   const handleTestPrompt = async () => {
     const text =
@@ -76,26 +119,6 @@ export default function Home() {
       setLoadingTest(false);
     }
   };
-
-  const handleScorePrompt = async () => {
-    try {
-      setLoadingScore(true);
-      setScoreResult(null);
-      const response = await fetch("http://127.0.0.1:8000/score-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: scoreInput }),
-      });
-      const data = await response.json();
-      setScoreResult(data);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to score prompt.");
-    } finally {
-      setLoadingScore(false);
-    }
-  };
-
 
   const handleGenerateQuestions = async () => {
     try {
@@ -250,175 +273,7 @@ export default function Home() {
         </div>
 
 
-        {/* Tabs */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: "30px" }}>
-          <div style={{
-            display: "flex",
-            background: "rgba(255,255,255,0.05)",
-            padding: "6px",
-            borderRadius: "20px",
-            border: "1px solid rgba(255,255,255,0.1)",
-          }}>
-            <button
-              onClick={() => setActiveTab("generator")}
-              style={{
-                padding: "10px 24px",
-                background: activeTab === "generator" ? "rgba(99,102,241,0.2)" : "transparent",
-                color: activeTab === "generator" ? "#fff" : "#94a3b8",
-                border: "none",
-                borderRadius: "14px",
-                fontSize: "15px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              ✨ Generator
-            </button>
-            <button
-              onClick={() => setActiveTab("scorer")}
-              style={{
-                padding: "10px 24px",
-                background: activeTab === "scorer" ? "rgba(16,185,129,0.2)" : "transparent",
-                color: activeTab === "scorer" ? "#fff" : "#94a3b8",
-                border: "none",
-                borderRadius: "14px",
-                fontSize: "15px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              🎯 Scorer
-            </button>
-          </div>
-        </div>
-
-        {activeTab === "scorer" && (
-          <div>
-            <div style={{
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "24px",
-              padding: "32px",
-              marginBottom: "28px",
-              backdropFilter: "blur(10px)",
-            }}>
-              <label style={{ color: "#94a3b8", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: "12px" }}>
-                Your Prompt to Evaluate
-              </label>
-              <textarea
-                placeholder="Paste your prompt here to get a score and suggestions..."
-                value={scoreInput}
-                onChange={(e) => setScoreInput(e.target.value)}
-                style={{
-                  width: "100%", height: "160px", padding: "18px", borderRadius: "16px",
-                  border: "2px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)",
-                  color: "#f1f5f9", fontSize: "16px", outline: "none", resize: "none", marginBottom: "20px",
-                  boxSizing: "border-box", lineHeight: 1.6, transition: "border-color 0.2s",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "rgba(16,185,129,0.6)")}
-                onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-              />
-              <button
-                onClick={handleScorePrompt}
-                disabled={!scoreInput.trim() || loadingScore}
-                style={{
-                  padding: "16px 32px",
-                  background: scoreInput.trim() ? "linear-gradient(135deg, #10b981, #059669)" : "rgba(255,255,255,0.08)",
-                  color: scoreInput.trim() ? "#ffffff" : "#475569",
-                  border: "none", borderRadius: "14px", fontSize: "16px", fontWeight: 700,
-                  cursor: scoreInput.trim() ? "pointer" : "not-allowed", transition: "all 0.2s",
-                  display: "flex", alignItems: "center", gap: "10px",
-                }}
-              >
-                {loadingScore ? "⏳ Scoring..." : "🎯 Score Prompt"}
-              </button>
-            </div>
-
-            {scoreResult && (
-              <div style={{ marginTop: "20px" }}>
-                <div style={{
-                  background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.15))",
-                  border: "1px solid rgba(16,185,129,0.3)", borderRadius: "24px", padding: "32px", marginBottom: "20px",
-                  display: "flex", alignItems: "center", justifyContent: "space-between"
-                }}>
-                  <div>
-                    <h2 style={{ color: "#f1f5f9", fontSize: "28px", fontWeight: 800, margin: "0 0 10px" }}>Prompt Evaluation Score</h2>
-                    <p style={{ color: "#94a3b8", fontSize: "15px", margin: 0 }}>Here is how your prompt performed across key criteria.</p>
-                  </div>
-                  <div style={{
-                    textAlign: "center", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "20px", padding: "16px 24px", minWidth: "140px",
-                  }}>
-                    <div style={{ color: "#94a3b8", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Total Score</div>
-                    <div style={{
-                      fontSize: "36px", fontWeight: 800,
-                      color: scoreResult.score >= 80 ? "#10b981" : scoreResult.score >= 60 ? "#f59e0b" : "#ef4444",
-                    }}>
-                      {scoreResult.score}<span style={{ fontSize: "16px", color: "#475569" }}>/100</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
-                    <h3 style={{ color: "#f1f5f9", fontSize: "16px", fontWeight: 700, margin: "0 0 16px" }}>📊 Criteria Breakdown</h3>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      {Object.entries(scoreResult.criteria || {}).map(([label, score]) => {
-                        const numericScore = typeof score === 'number' ? score : 0;
-                        return (
-                          <div key={label}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                              <span style={{ color: "#94a3b8", fontSize: "13px", textTransform: "capitalize" }}>{label.replace('_', ' ')}</span>
-                              <span style={{ color: "#e2e8f0", fontSize: "13px", fontWeight: 600 }}>{numericScore}/20</span>
-                            </div>
-                            <div style={{ height: "6px", background: "rgba(255,255,255,0.05)", borderRadius: "3px", overflow: "hidden" }}>
-                              <div style={{ height: "100%", width: `${(numericScore / 20) * 100}%`, background: "linear-gradient(90deg, #10b981, #059669)", borderRadius: "3px" }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
-                    <h3 style={{ color: "#f1f5f9", fontSize: "16px", fontWeight: 700, margin: "0 0 16px" }}>💡 Suggestions for Improvement</h3>
-                    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
-                      {(scoreResult.suggestions || []).map((tip: any, i: number) => (
-                        <li key={i} style={{ color: "#cbd5e1", fontSize: "13.5px", lineHeight: 1.5, display: "flex", gap: "10px", padding: "10px", background: "rgba(255,255,255,0.02)", borderRadius: "10px" }}>
-                          <span style={{ color: "#10b981" }}>•</span>{tip}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {scoreResult.rewritten_prompt && (
-                  <div style={{ background: "rgba(15, 23, 42, 0.8)", border: "1px solid rgba(16,185,129,0.4)", borderRadius: "20px", overflow: "hidden", boxShadow: "0 25px 60px rgba(0,0,0,0.4)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "rgba(16,185,129,0.1)", borderBottom: "1px solid rgba(16,185,129,0.2)" }}>
-                      <span style={{ color: "#f1f5f9", fontSize: "15px", fontWeight: 700 }}>✨ AI Rewritten Prompt</span>
-                      <button
-                        onClick={() => { navigator.clipboard.writeText(scoreResult.rewritten_prompt); setScoreCopied(true); setTimeout(() => setScoreCopied(false), 2500); }}
-                        style={{ padding: "8px 18px", background: scoreCopied ? "linear-gradient(135deg, #10b981, #059669)" : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "7px", transition: "all 0.3s" }}
-                      >
-                        {scoreCopied ? "✅ Copied!" : "📋 Copy Prompt"}
-                      </button>
-                    </div>
-                    <div style={{ padding: "28px 32px" }}>
-                      <pre style={{ color: "#e2e8f0", fontSize: "15px", lineHeight: "1.85", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
-                        {scoreResult.rewritten_prompt}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === "generator" && (
-          <div id="generator-wrapper">
+        <div id="generator-wrapper">
 
             {/* Input Card */}
             <div style={{
@@ -868,14 +723,27 @@ export default function Home() {
                 }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "20px", flexWrap: "wrap" }}>
                     <div>
-                      <div style={{
-                        display: "inline-flex", alignItems: "center", gap: "8px",
-                        background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
-                        borderRadius: "20px", padding: "5px 14px",
-                        fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px",
-                        marginBottom: "14px",
-                      }}>
-                        ✅ Smart Prompt Generated
+                      <div style={{ display: "flex", gap: "10px", marginBottom: "14px", flexWrap: "wrap" }}>
+                        <div style={{
+                          display: "inline-flex", alignItems: "center", gap: "8px",
+                          background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
+                          borderRadius: "20px", padding: "5px 14px",
+                          fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px",
+                        }}>
+                          ✅ Smart Prompt Generated
+                        </div>
+                        {finalPrompt.score !== undefined && (
+                          <div style={{
+                            display: "inline-flex", alignItems: "center", gap: "8px",
+                            background: finalPrompt.score >= 80 ? "rgba(16,185,129,0.2)" : finalPrompt.score >= 60 ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)",
+                            color: finalPrompt.score >= 80 ? "#34d399" : finalPrompt.score >= 60 ? "#fbbf24" : "#f87171",
+                            borderRadius: "20px", padding: "5px 14px",
+                            fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px",
+                            border: `1px solid ${finalPrompt.score >= 80 ? "rgba(16,185,129,0.3)" : finalPrompt.score >= 60 ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`
+                          }}>
+                            🎯 Quality Score: {finalPrompt.score}/100
+                          </div>
+                        )}
                       </div>
                       <h2 style={{
                         color: "#f1f5f9", fontSize: "28px", fontWeight: 800,
@@ -1163,7 +1031,17 @@ export default function Home() {
                   display: "flex", justifyContent: "center",
                 }}>
                   <button
-                    onClick={() => { setQuestions([]); setFinalPrompt(null); setAnswers({}); setUserInput(""); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => {
+                      setQuestions([]);
+                      setFinalPrompt(null);
+                      setAnswers({});
+                      setCustomAnswers({});
+                      setUserInput("");
+                      setTargetAi("");
+                      setTestResponse(null);
+                      localStorage.clear();
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     style={{
                       display: "flex", alignItems: "center", gap: "10px",
                       background: "rgba(239,68,68,0.1)",
@@ -1180,10 +1058,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-      </div>
-
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }

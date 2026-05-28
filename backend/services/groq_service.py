@@ -132,6 +132,10 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
         
         final_smart_prompt, meta = await asyncio.gather(final_prompt_task, metadata_task)
         
+        # Automatically score the generated prompt
+        score_data = await process_prompt_scoring(final_smart_prompt)
+        meta["score"] = score_data.get("score", 0)
+        
         meta["smart_prompt"] = final_smart_prompt
         
         return meta
