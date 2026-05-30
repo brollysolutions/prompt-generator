@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Zap, ShieldCheck, Copy, Play, Clock, X, Trash2, FileText, Sparkles, Download, Star, Calculator } from "lucide-react";
+import { ArrowLeft, Zap, ShieldCheck, Copy, Play, X, Trash2, FileText, Sparkles, Download, Star, Calculator } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { GetStartedButton } from "@/components/ui/get-started-button";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -50,12 +51,10 @@ export default function GeneratorPage() {
 
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(false);
-  const [loadingScore, setLoadingScore] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
 
   const [enhanceInstruction, setEnhanceInstruction] = useState("");
   const [loadingEnhance, setLoadingEnhance] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const handleEnhancePrompt = async () => {
     const text =
@@ -87,8 +86,6 @@ export default function GeneratorPage() {
       setFinalPrompt(updatedPrompt);
       setEnhanceInstruction("");
       localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
-
-      // Update in history as well if needed, or just let it stay as a new entry next time they "Save"
     } catch (error) {
       console.error(error);
       alert("Failed to enhance prompt.");
@@ -107,7 +104,6 @@ export default function GeneratorPage() {
       const savedFinalPrompt = localStorage.getItem("finalPrompt");
       const savedTargetAi = localStorage.getItem("targetAi");
       const savedTestResponse = localStorage.getItem("testResponse");
-      const savedHistory = localStorage.getItem("promptHistory");
 
       if (savedUserInput) setUserInput(savedUserInput);
       if (savedQuestions) setQuestions(JSON.parse(savedQuestions));
@@ -116,46 +112,10 @@ export default function GeneratorPage() {
       if (savedFinalPrompt) setFinalPrompt(JSON.parse(savedFinalPrompt));
       if (savedTargetAi) setTargetAi(savedTargetAi);
       if (savedTestResponse) setTestResponse(savedTestResponse);
-      if (savedHistory) setHistory(JSON.parse(savedHistory));
     };
 
     hydrate();
   }, []);
-
-  const handleScorePrompt = async () => {
-    const text =
-      finalPrompt?.smart_prompt ||
-      finalPrompt?.final_instruction ||
-      finalPrompt?.final_prompt ||
-      "";
-
-    if (!text) return;
-
-    try {
-      setLoadingScore(true);
-      const response = await fetch("http://127.0.0.1:8000/score-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
-      });
-      const data = await response.json();
-      
-      const updatedPrompt = {
-        ...finalPrompt,
-        quality_score: data.score,
-        quality_breakdown: data.criteria,
-        quality_feedback: data.suggestions,
-        rewritten_prompt: data.rewritten_prompt
-      };
-      setFinalPrompt(updatedPrompt);
-      localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
-    } catch (error) {
-      console.error(error);
-      alert("Failed to score prompt.");
-    } finally {
-      setLoadingScore(false);
-    }
-  };
 
   // Save to localStorage whenever state changes
   useEffect(() => {
@@ -243,6 +203,7 @@ export default function GeneratorPage() {
   const handleGenerateFinalPrompt = async () => {
     try {
       setLoadingPrompt(true);
+      setShowDetails(false); // Reset show details on new generation
 
       const processedAnswers = { ...answers };
       Object.keys(customAnswers).forEach((key) => {
@@ -269,24 +230,38 @@ export default function GeneratorPage() {
       });
       const data = await response.json();
       
+      const promptText = data.smart_prompt || data.final_instruction || data.final_prompt || "";
+
+      // Auto-score the generated prompt
+      let scoreData = {};
+      try {
+        const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: promptText }),
+        });
+        const fullScoreData = await scoreResponse.json();
+        scoreData = {
+          quality_score: fullScoreData.score,
+          quality_breakdown: fullScoreData.criteria,
+          quality_feedback: fullScoreData.suggestions,
+          rewritten_prompt: fullScoreData.rewritten_prompt
+        };
+      } catch (scoreError) {
+        console.error("Failed to auto-score prompt:", scoreError);
+      }
+
       // Ensure score data is correctly mapped if coming from initial generation
       const finalData = {
         ...data,
+        ...scoreData,
         id: Date.now(),
         timestamp: new Date().toISOString(),
         user_idea: userInput,
-        quality_score: data.quality_score ?? data.score,
-        quality_breakdown: data.quality_breakdown,
-        quality_feedback: data.quality_feedback
       };
       
       setFinalPrompt(finalData);
       localStorage.setItem("finalPrompt", JSON.stringify(finalData));
-
-      // Add to history
-      const newHistory = [finalData, ...history.slice(0, 19)]; // Keep last 20
-      setHistory(newHistory);
-      localStorage.setItem("promptHistory", JSON.stringify(newHistory));
       
       setTimeout(() => {
         document.getElementById("smart-prompt-result")?.scrollIntoView({ behavior: "smooth" });
@@ -305,20 +280,8 @@ export default function GeneratorPage() {
       finalPrompt?.final_instruction ||
       finalPrompt?.final_prompt ||
       "";
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-  };
-
-  const handleCopyMarkdown = () => {
-    const text =
-      finalPrompt?.smart_prompt ||
-      finalPrompt?.final_instruction ||
-      finalPrompt?.final_prompt ||
-      "";
-    const markdown = "```markdown\n" + text + "\n```";
-    navigator.clipboard.writeText(markdown).then(() => {
+    const markdownText = "```markdown\n" + text + "\n```";
+    navigator.clipboard.writeText(markdownText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
@@ -350,25 +313,34 @@ export default function GeneratorPage() {
             <ArrowLeft size={20} /> Back to Home
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <button 
-              onClick={() => setShowHistory(true)}
+            <Link 
+              href="/library"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
                 padding: "8px 16px",
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "#D4AF37",
-                background: "#ffffff",
-                border: "1px solid #D4AF37",
+                color: "#6b7280",
+                background: "#f3f4f6",
                 borderRadius: "10px",
-                cursor: "pointer",
-                transition: "all 0.2s"
+                textDecoration: "none"
               }}
             >
-              <Clock size={16} /> History
-            </button>
+              Library
+            </Link>
+            <Link 
+              href="/history"
+              style={{
+                padding: "8px 16px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "#6b7280",
+                background: "#f3f4f6",
+                borderRadius: "10px",
+                textDecoration: "none"
+              }}
+            >
+              History
+            </Link>
             <button 
               onClick={() => {
                 if(confirm("Clear all your work?")) {
@@ -823,7 +795,7 @@ export default function GeneratorPage() {
               style={{ marginTop: "30px" }}
             >
               <div style={{
-                background: "rgba(255, 255, 255, 0.7)",
+                background: "#F3F4F4",
                 backdropFilter: "blur(12px)",
                 border: "2px solid rgba(212, 175, 55, 0.6)",
                 borderRadius: "20px",
@@ -842,27 +814,6 @@ export default function GeneratorPage() {
                   </div>
                   <div style={{ display: "flex", gap: "10px" }}>
                     <button
-                      onClick={handleScorePrompt}
-                      disabled={loadingScore}
-                      style={{
-                        padding: "8px 18px",
-                        background: "#D4AF37",
-                        color: "#000000",
-                        border: "none",
-                        borderRadius: "10px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px"
-                      }}
-                    >
-                      {loadingScore ? (
-                         <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>⟳</motion.span>
-                      ) : <Zap size={16} />}
-                      Score Prompt
-                    </button>
-                    <button
                       onClick={handleCopy}
                       style={{
                         padding: "8px 18px",
@@ -880,23 +831,6 @@ export default function GeneratorPage() {
                       {copied ? <ShieldCheck size={16} /> : <Copy size={16} />}
                       {copied ? "Copied!" : "Copy"}
                     </button>
-                    <button
-                      onClick={handleCopyMarkdown}
-                      style={{
-                        padding: "8px 18px",
-                        background: "#ffffff",
-                        color: "#000000",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px"
-                      }}
-                    >
-                      <FileText size={16} /> Markdown
-                    </button>
                   </div>
                 </div>
 
@@ -907,7 +841,25 @@ export default function GeneratorPage() {
                     borderBottom: "1px solid #D4AF37" 
                   }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                      <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#000000" }}>Quality Audit</h3>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#000000" }}>Quality Audit</h3>
+                        <button 
+                          onClick={() => setShowDetails(!showDetails)}
+                          style={{
+                            background: "none",
+                            border: "1px solid #D4AF37",
+                            color: "#D4AF37",
+                            padding: "4px 12px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          {showDetails ? "Hide Details" : "View Details"}
+                        </button>
+                      </div>
                       <div style={{ 
                         fontSize: "24px", 
                         fontWeight: 800, 
@@ -917,46 +869,57 @@ export default function GeneratorPage() {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                      {finalPrompt.quality_breakdown && Object.entries(finalPrompt.quality_breakdown).map(([key, val]) => (
-                        <div key={key} style={{ background: "rgba(255, 255, 255, 0.6)", padding: "14px", borderRadius: "12px", border: "1px solid rgba(229, 231, 235, 0.5)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                            <div style={{ fontSize: "11px", color: "#6b7280", textTransform: "uppercase", fontWeight: 700 }}>{key}</div>
-                            <div style={{ fontSize: "12px", fontWeight: 700, color: "#000000" }}>{val as number}/20</div>
+                    <AnimatePresence>
+                      {showDetails && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                            {finalPrompt.quality_breakdown && Object.entries(finalPrompt.quality_breakdown).map(([key, val]) => (
+                              <div key={key} style={{ background: "rgba(255, 255, 255, 0.6)", padding: "14px", borderRadius: "12px", border: "1px solid rgba(229, 231, 235, 0.5)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                                  <div style={{ fontSize: "11px", color: "#6b7280", textTransform: "uppercase", fontWeight: 700 }}>{key}</div>
+                                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#000000" }}>{val as number}/20</div>
+                                </div>
+                                <div style={{ width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "3px", overflow: "hidden" }}>
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${((val as number) / 20) * 100}%` }}
+                                    transition={{ duration: 1, ease: "easeOut" }}
+                                    style={{ 
+                                      height: "100%", 
+                                      background: (val as number) > 16 ? "#10b981" : (val as number) > 12 ? "#D4AF37" : "#ef4444",
+                                      borderRadius: "3px"
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          <div style={{ width: "100%", height: "6px", background: "#e5e7eb", borderRadius: "3px", overflow: "hidden" }}>
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${((val as number) / 20) * 100}%` }}
-                              transition={{ duration: 1, ease: "easeOut" }}
-                              style={{ 
-                                height: "100%", 
-                                background: (val as number) > 16 ? "#10b981" : (val as number) > 12 ? "#D4AF37" : "#ef4444",
-                                borderRadius: "3px"
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
 
-                    {finalPrompt.quality_feedback && finalPrompt.quality_feedback.length > 0 && (
-                      <div style={{ background: "rgba(255, 251, 235, 0.6)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(254, 243, 199, 0.5)" }}>
-                        <div style={{ color: "#92400E", fontWeight: 700, fontSize: "13px", marginBottom: "8px", textTransform: "uppercase" }}>Optimization Tips</div>
-                        <ul style={{ margin: 0, paddingLeft: "20px", color: "#92400E", fontSize: "14px" }}>
-                          {finalPrompt.quality_feedback.map((tip, i) => (
-                            <li key={i} style={{ marginBottom: "4px" }}>{tip}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                          {finalPrompt.quality_feedback && finalPrompt.quality_feedback.length > 0 && (
+                            <div style={{ background: "rgba(255, 251, 235, 0.6)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(254, 243, 199, 0.5)" }}>
+                              <div style={{ color: "#92400E", fontWeight: 700, fontSize: "13px", marginBottom: "8px", textTransform: "uppercase" }}>Optimization Tips</div>
+                              <ul style={{ margin: 0, paddingLeft: "20px", color: "#92400E", fontSize: "14px" }}>
+                                {finalPrompt.quality_feedback.map((tip, i) => (
+                                  <li key={i} style={{ marginBottom: "4px" }}>{tip}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )}
 
                 <div style={{ padding: "28px 32px" }}>
                   <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || ""}
+                      {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
                     </ReactMarkdown>
                   </div>
                 </div>
@@ -1085,178 +1048,6 @@ export default function GeneratorPage() {
       </div>
     </div>
     
-      {/* History Sidebar */}
-      <AnimatePresence>
-        {showHistory && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowHistory(false)}
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                background: "rgba(0,0,0,0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 200,
-              }}
-            />
-            {/* Sidebar */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              style={{
-                position: "fixed",
-                top: 0,
-                right: 0,
-                width: "100%",
-                maxWidth: "400px",
-                height: "100%",
-                background: "#ffffff",
-                zIndex: 201,
-                boxShadow: "-10px 0 30px rgba(0,0,0,0.1)",
-                display: "flex",
-                flexDirection: "column"
-              }}
-            >
-              <div style={{ padding: "24px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Clock size={22} color="#D4AF37" />
-                  <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Prompt History</h2>
-                </div>
-                <button 
-                  onClick={() => setShowHistory(false)}
-                  style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "6px", cursor: "pointer" }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-                {history.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 20px", color: "#6b7280" }}>
-                    <div style={{ fontSize: "40px", marginBottom: "10px" }}>📜</div>
-                    <p>No prompts generated yet. Start building to see your history!</p>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    {history.map((item) => (
-                      <div 
-                        key={item.id}
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "16px",
-                          padding: "16px",
-                          position: "relative",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        <div style={{ fontSize: "11px", color: "#D4AF37", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>
-                          {new Date(item.timestamp).toLocaleDateString()} at {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                        <p style={{ 
-                          fontSize: "14px", 
-                          fontWeight: 600, 
-                          color: "#1f2937", 
-                          margin: "0 0 12px 0",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden"
-                        }}>
-                          {item.user_idea}
-                        </p>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button
-                            onClick={() => {
-                              setFinalPrompt(item);
-                              setShowHistory(false);
-                              setTimeout(() => {
-                                document.getElementById("smart-prompt-result")?.scrollIntoView({ behavior: "smooth" });
-                              }, 100);
-                            }}
-                            style={{
-                              flex: 1,
-                              padding: "8px",
-                              background: "#000000",
-                              color: "#ffffff",
-                              borderRadius: "8px",
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              border: "none"
-                            }}
-                          >
-                            View Prompt
-                          </button>
-                          <button
-                            onClick={() => {
-                              if(confirm("Delete this prompt?")) {
-                                const newHist = history.filter(h => h.id !== item.id);
-                                setHistory(newHist);
-                                localStorage.setItem("promptHistory", JSON.stringify(newHist));
-                              }
-                            }}
-                            style={{
-                              padding: "8px",
-                              background: "#fee2e2",
-                              color: "#ef4444",
-                              borderRadius: "8px",
-                              border: "none",
-                              cursor: "pointer"
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {history.length > 0 && (
-                <div style={{ padding: "20px", borderTop: "1px solid #e5e7eb" }}>
-                  <button
-                    onClick={() => {
-                      if(confirm("Clear your entire history?")) {
-                        setHistory([]);
-                        localStorage.removeItem("promptHistory");
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      background: "#f3f4f6",
-                      color: "#ef4444",
-                      borderRadius: "12px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px"
-                    }}
-                  >
-                    <Trash2 size={16} /> Clear All History
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
@@ -1334,8 +1125,8 @@ export default function GeneratorPage() {
           color: #D4AF37;
         }
         .markdown-content pre {
-          background: #000000;
-          color: #ffffff;
+          background: #F3F4F4;
+          color: #000000;
           padding: 20px;
           border-radius: 12px;
           overflow-x: auto;
