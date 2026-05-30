@@ -12,8 +12,10 @@ from services.groq_service import (
     generate_questions,
     generate_final_prompt,
     process_prompt_scoring,
-    test_generated_prompt
+    test_generated_prompt,
+    auto_categorize_prompt
 )
+from database import save_prompt_version, get_prompt_history, save_library_prompt, get_library_prompts
 
 app = FastAPI()
 
@@ -65,6 +67,11 @@ class FinalPromptRequest(BaseModel):
 class TestPromptRequest(BaseModel):
     prompt: str
 
+class VersionRequest(BaseModel):
+    session_id: str
+    prompt_text: str
+    source: str
+
 
 # =========================
 # HOME ROUTE
@@ -102,6 +109,20 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
     # Generate the dynamic prompt using the imported Groq service function
     result = await generate_final_prompt(user_input, answers, questions, target_ai)
 
+    # Auto-categorize and save to library in the background
+    try:
+        prompt_text = result.get("smart_prompt") or result.get("final_instruction") or result.get("final_prompt")
+        if prompt_text:
+            cat_data = await auto_categorize_prompt(prompt_text)
+            save_library_prompt(
+                name=cat_data.get("name", "New Prompt"),
+                prompt_text=prompt_text,
+                tags=cat_data.get("tags", []),
+                category=cat_data.get("category", "General")
+            )
+    except Exception as e:
+        logger.error(f"Failed to auto-categorize/save to library: {e}")
+
     return result
 
 # =========================
@@ -123,3 +144,68 @@ async def test_prompt_api(data: TestPromptRequest):
     return {
         "response": response_text
     }
+
+# =========================
+# HISTORY API
+# =========================
+
+@app.post("/history")
+async def save_history_api(data: VersionRequest):
+    version_id = save_prompt_version(data.session_id, data.prompt_text, data.source)
+
+    # Automatically save to library if it's explicitly edited in history
+    if data.source == "edited (history)":
+        try:
+            cat_data = await auto_categorize_prompt(data.prompt_text)
+            save_library_prompt(
+                name=cat_data.get("name", "Edited Prompt"),
+                prompt_text=data.prompt_text,
+                tags=cat_data.get("tags", []),
+                category=cat_data.get("category", "General")
+            )
+        except Exception as e:
+            logger.error(f"Failed to save edited history to library: {e}")
+
+    return {"id": version_id}
+
+@app.get("/history")
+async def get_history_api():
+    history = get_prompt_history()
+    return {"history": history}
+
+# =========================
+# LIBRARY API
+# =========================
+
+@app.get("/library")
+async def get_library_api():
+    prompts = get_library_prompts()
+    return {"prompts": prompts}
+
+import asyncio
+
+@app.get("/migrate-history")
+async def migrate_history_api():
+    history = get_prompt_history()
+    existing_library = get_library_prompts()
+    existing_texts = {p['prompt_text'] for p in existing_library}
+    
+    migrated = 0
+    for h in history:
+        text = h['prompt_text']
+        if text and text not in existing_texts:
+            try:
+                cat_data = await auto_categorize_prompt(text)
+                save_library_prompt(
+                    name=cat_data.get("name", "Migrated Prompt"),
+                    prompt_text=text,
+                    tags=cat_data.get("tags", []),
+                    category=cat_data.get("category", "General")
+                )
+                existing_texts.add(text)
+                migrated += 1
+                await asyncio.sleep(1) # delay to prevent rate limits
+            except Exception as e:
+                logger.error(f"Failed to migrate prompt: {e}")
+                
+    return {"message": f"Successfully categorized and migrated {migrated} historical prompts to your Library!"}

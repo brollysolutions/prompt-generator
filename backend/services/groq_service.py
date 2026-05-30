@@ -372,3 +372,43 @@ async def test_generated_prompt(prompt: str) -> str:
     except Exception as e:
         print("EXCEPTION testing prompt:", e)
         return f"Error: Failed to test prompt. {str(e)}"
+
+# =========================
+# AUTO CATEGORIZATION
+# =========================
+
+async def auto_categorize_prompt(prompt_text: str) -> dict:
+    """Uses LLM to automatically generate metadata (name, tags, category) for a prompt."""
+    prompt = f"""Analyze the following AI prompt and provide organizational metadata.
+
+PROMPT:
+{prompt_text}
+
+TASK:
+Generate a catchy title (name), a broad category, and 3-5 relevant tags.
+
+Return ONLY a JSON object matching this schema:
+{{
+  "name": "Title of the prompt",
+  "category": "Broad category",
+  "tags": ["tag1", "tag2", "tag3"]
+}}"""
+
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=500,
+            response_format={"type": "json_object"}
+        )
+
+        result_content = response.choices[0].message.content.strip()
+        return json.loads(result_content)
+    except Exception as e:
+        print(f"EXCEPTION in auto_categorize_prompt: {str(e)}")
+        return {
+            "name": "General Prompt",
+            "category": "Uncategorized",
+            "tags": ["general"]
+        }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 type Question = {
   question: string;
@@ -40,6 +41,8 @@ export default function Home() {
 
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(false);
+
+  const [sessionId, setSessionId] = useState<string>("");
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -88,6 +91,33 @@ export default function Home() {
   useEffect(() => {
     if (testResponse) localStorage.setItem("testResponse", testResponse);
   }, [testResponse]);
+
+  // Session management
+  useEffect(() => {
+    let sId = localStorage.getItem("sessionId");
+    if (!sId) {
+      sId = crypto.randomUUID();
+      localStorage.setItem("sessionId", sId);
+    }
+    setSessionId(sId);
+  }, []);
+
+  const saveToHistory = async (text: string, source: string) => {
+    if (!text || !sessionId) return;
+    try {
+      await fetch("http://127.0.0.1:8000/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          prompt_text: text,
+          source: source
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to save history", error);
+    }
+  };
 
   const handleTestPrompt = async () => {
     const text =
@@ -171,6 +201,13 @@ export default function Home() {
       });
       const data = await response.json();
       setFinalPrompt(data);
+
+      // Save to history automatically
+      const text = data.smart_prompt || data.final_instruction || data.final_prompt || "";
+      if (text) {
+        saveToHistory(text, "generated");
+      }
+
       // Scroll to result
       setTimeout(() => {
         document.getElementById("smart-prompt-result")?.scrollIntoView({ behavior: "smooth" });
@@ -194,8 +231,6 @@ export default function Home() {
       setTimeout(() => setCopied(false), 2500);
     });
   };
-
-  const sections = [];
 
   return (
     <div style={{
@@ -227,7 +262,29 @@ export default function Home() {
         <span style={{ color: "#fff", fontWeight: 700, fontSize: "20px", letterSpacing: "-0.3px" }}>
           Smart Prompt Generator
         </span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "12px" }}>
+          <Link href="/library" style={{
+            textDecoration: "none",
+            background: "rgba(255,255,255,0.08)",
+            color: "#fff",
+            padding: "8px 18px",
+            borderRadius: "12px",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}>
+            Library
+          </Link>
+          <Link href="/history" style={{
+            textDecoration: "none",
+            background: "rgba(255,255,255,0.08)",
+            color: "#fff",
+            padding: "8px 18px",
+            borderRadius: "12px",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}>
+            History
+          </Link>
           <div style={{
             background: "rgba(99,102,241,0.2)", color: "#a5b4fc",
             border: "1px solid rgba(99,102,241,0.3)",
@@ -819,63 +876,6 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Metadata Sections Grid */}
-                {sections.some(s => finalPrompt[s.key as keyof SmartPromptResult]) && (
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                    gap: "16px",
-                    marginBottom: "20px",
-                  }}>
-                    {sections.map(({ key, label, icon, color }) => {
-                      const value = finalPrompt[key as keyof SmartPromptResult];
-                      if (!value) return null;
-                      const isActive = activeSection === key;
-                      return (
-                        <div
-                          key={key}
-                          onClick={() => setActiveSection(isActive ? null : key)}
-                          style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: `1px solid ${isActive ? color + "60" : "rgba(255,255,255,0.08)"}`,
-                            borderRadius: "16px",
-                            padding: "20px",
-                            cursor: "pointer",
-                            transition: "all 0.2s",
-                            boxShadow: isActive ? `0 0 20px ${color}20` : "none",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: isActive ? "12px" : "0" }}>
-                            <div style={{
-                              width: "32px", height: "32px",
-                              background: color + "20",
-                              borderRadius: "8px",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "14px", border: `1px solid ${color}40`,
-                            }}>{icon}</div>
-                            <span style={{ color: "#e2e8f0", fontWeight: 600, fontSize: "14px" }}>
-                              {label.replace(/^.+ /, "")}
-                            </span>
-                            <span style={{
-                              marginLeft: "auto", color: "#475569", fontSize: "12px",
-                              transform: isActive ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s",
-                            }}>▼</span>
-                          </div>
-                          {isActive && (
-                            <p style={{
-                              color: "#94a3b8", fontSize: "14px", margin: 0,
-                              lineHeight: 1.7, paddingTop: "4px",
-                              borderTop: "1px solid rgba(255,255,255,0.06)",
-                            }}>
-                              {value as string}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
                 {/* The Big Smart Prompt */}
                 <div style={{
                   background: "rgba(15, 23, 42, 0.8)",
@@ -927,20 +927,40 @@ export default function Home() {
 
                   {/* Prompt Content */}
                   <div style={{ padding: "28px 32px" }}>
-                    <pre style={{
-                      color: "#e2e8f0",
-                      fontSize: "15px",
-                      lineHeight: "1.85",
-                      margin: 0,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      fontFamily: "'Inter', 'Segoe UI', sans-serif",
-                    }}>
-                      {finalPrompt.smart_prompt ||
+                    <textarea
+                      value={
+                        finalPrompt.smart_prompt ||
                         finalPrompt.final_instruction ||
                         finalPrompt.final_prompt ||
-                        "No prompt generated."}
-                    </pre>
+                        ""
+                      }
+                      onChange={(e) => {
+                        setFinalPrompt({
+                          ...finalPrompt,
+                          smart_prompt: e.target.value,
+                          final_instruction: undefined,
+                          final_prompt: undefined
+                        });
+                      }}
+                      onBlur={(e) => {
+                        saveToHistory(e.target.value, "edited");
+                      }}
+                      style={{
+                        width: "100%",
+                        minHeight: "400px",
+                        background: "transparent",
+                        border: "none",
+                        color: "#e2e8f0",
+                        fontSize: "15px",
+                        lineHeight: "1.85",
+                        margin: 0,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                        outline: "none",
+                        resize: "vertical",
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -1025,6 +1045,50 @@ export default function Home() {
                   )}
                 </div>
 
+                {/* Navigation to History Page */}
+                <div style={{
+                  marginTop: "30px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "24px",
+                  padding: "32px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "20px",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{
+                      width: "36px", height: "36px",
+                      background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+                      borderRadius: "10px",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "18px",
+                    }}>📜</div>
+                    <div>
+                      <h2 style={{ color: "#f1f5f9", fontSize: "18px", fontWeight: 700, margin: 0 }}>
+                        Version History
+                      </h2>
+                      <p style={{ color: "#64748b", fontSize: "13px", margin: "2px 0 0" }}>
+                        View all generated and edited versions
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/history" style={{
+                    textDecoration: "none",
+                    padding: "12px 24px",
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px",
+                    color: "#fff",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    transition: "all 0.2s",
+                  }}>
+                    View History Page →
+                  </Link>
+                </div>
+
                 {/* Footer Actions */}
                 <div style={{
                   marginTop: "30px",
@@ -1058,6 +1122,8 @@ export default function Home() {
                 </div>
               </div>
             )}
+        </div>
+      </div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
