@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #D4AF37;
 }
 
 @theme inline {
@@ -10,12 +10,30 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-gold: #D4AF37;
+  --color-gold-dark: #AA8A27;
+  --shadow-button: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-button-inset: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --shadow-button-inset-dark: inset 0 2px 4px 0 rgb(0 0 0 / 0.5);
+
+  @keyframes shine {
+    0% {
+      background-position: 0% 0%;
+    }
+    50% {
+      background-position: 100% 100%;
+    }
+    to {
+      background-position: 0% 0%;
+    }
+  }
+  --animate-shine: shine var(--duration) infinite linear;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #000000;
+    --foreground: #D4AF37;
   }
 }
 

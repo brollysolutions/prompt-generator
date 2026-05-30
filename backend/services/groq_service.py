@@ -107,7 +107,7 @@ Return ONLY a JSON object matching this exact schema:
 # GENERATE FINAL PROMPT
 # =========================
 
-async def generate_final_prompt(user_input, answers, questions=None, target_ai=""):
+async def generate_final_prompt(user_input, answers, questions=None, target_ai="", caveman_mode=False):
     try:
         # Build detailed Q&A context using question text if available
         qa_lines = []
@@ -123,7 +123,7 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
         qa_context = "\n\n".join(qa_lines) if qa_lines else "(No answers provided)"
 
         # Step 1: Draft the initial version
-        draft_prompt = await _build_smart_prompt_text(user_input, qa_context, target_ai)
+        draft_prompt = await _build_smart_prompt_text(user_input, qa_context, target_ai, caveman_mode)
         
         # Step 2: Parallel execution of Metadata and Self-Correction
         # This eliminates sequential waiting for metadata
@@ -135,6 +135,10 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
         # Automatically score the generated prompt
         score_data = await process_prompt_scoring(final_smart_prompt)
         meta["score"] = score_data.get("score", 0)
+        meta["quality_score"] = score_data.get("score", 0)
+        meta["quality_breakdown"] = score_data.get("criteria", {})
+        meta["quality_feedback"] = score_data.get("suggestions", [])
+        meta["rewritten_prompt"] = score_data.get("rewritten_prompt", "")
         
         meta["smart_prompt"] = final_smart_prompt
         
@@ -173,8 +177,9 @@ TASK:
 2. Rewrite the prompt to be more surgical, precise, and effective.
 3. Address specific model requirements if mentioned.
 4. DO NOT add unnecessary bloat; keep it focused on the user's objective.
+5. CRITICAL: Ensure the output is an EXECUTION PROMPT that performs the task directly. DO NOT ask the AI to "write a prompt".
 
-Write the final perfected master prompt now:"""
+Write the final perfected master execution prompt now:"""
 
     try:
         response = await client.chat.completions.create(
@@ -189,12 +194,30 @@ Write the final perfected master prompt now:"""
         return draft_prompt
 
 
-async def _build_smart_prompt_text(user_input: str, qa_context: str, target_ai: str = "") -> str:
+async def _build_smart_prompt_text(user_input: str, qa_context: str, target_ai: str = "", caveman_mode: bool = False) -> str:
     """Initial draft generation."""
     
     optimization_instruction = ""
     if target_ai:
-        optimization_instruction = f"IMPORTANT: Optimize this prompt specifically for use with {target_ai}."
+        if "Claude" in target_ai:
+            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Use XML tags for structure and provide extremely clear, step-by-step instructions as Claude prefers detailed chain-of-thought."
+        elif "ChatGPT" in target_ai:
+            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Focus on clear role definition and Markdown headers. Use a direct, persona-driven approach."
+        elif "Gemini" in target_ai:
+            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Focus on structured reasoning and comprehensive context. Gemini performs best with multi-faceted instructions."
+        elif "DeepSeek" in target_ai:
+            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. DeepSeek excels at logic and coding; ensure the prompt is highly analytical and structurally sound."
+        else:
+            optimization_instruction = f"IMPORTANT: Optimize this prompt specifically for use with {target_ai}."
+
+    caveman_instruction = ""
+    if caveman_mode:
+        caveman_instruction = """
+CAVEMAN MODE ACTIVE (Token Compression):
+1. The prompt you generate must instruct the target AI to strip linguistic filler, articles, and pleasantries.
+2. The target AI should use a 'primitive' but high-reasoning style to save 60-80% of tokens.
+3. Ensure the prompt itself is concise but includes all critical context.
+"""
 
     prompt = f"""You are a world-class AI Prompt Engineer.
 
@@ -204,7 +227,13 @@ USER INITIAL IDEA:
 USER ANSWERS & CONTEXT:
 {qa_context}
 
-Write a COMPLETE, highly detailed, ready-to-use master prompt with these headers:
+CRITICAL RULE:
+You are writing an EXECUTION PROMPT. This prompt will be pasted into another AI (like ChatGPT or Claude) to IMMEDIATELY perform the user's task.
+1. DO NOT write a prompt that asks the AI to "write a prompt".
+2. The output MUST be the final prompt that, when executed, produces the actual results (code, text, analysis, etc.) the user wants.
+3. Use a strong, expert persona in the generated prompt (e.g., "You are an expert Python Developer", "You are a Master Copywriter").
+
+Write a COMPLETE, highly detailed, ready-to-use master execution prompt with these headers:
 # Role & Persona
 # Context & Background
 # Core Objective
@@ -213,8 +242,9 @@ Write a COMPLETE, highly detailed, ready-to-use master prompt with these headers
 # Expected Output Format
 
 {optimization_instruction}
+{caveman_instruction}
 
-Write the master prompt content now:"""
+Write the master execution prompt now:"""
 
     try:
         response = await client.chat.completions.create(
@@ -320,7 +350,12 @@ async def rewrite_prompt_step2(prompt: str, evaluation_json: dict) -> str:
     rewrite_prompt = f"""You are an expert AI Prompt Engineer.
 Feedback: {json.dumps(evaluation_json)}
 Original: {prompt}
-Rewrite it to be better. Return ONLY the text."""
+Rewrite it to be better. 
+
+CRITICAL:
+1. Ensure the output is an EXECUTION PROMPT that immediately completes the user's task when pasted into an LLM.
+2. DO NOT ask the AI to "write a prompt".
+3. Return ONLY the text of the new master execution prompt."""
     try:
         response = await client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -354,6 +389,29 @@ async def process_prompt_scoring(prompt: str) -> dict:
     except Exception as e:
         print(f"EXCEPTION in process_prompt_scoring: {str(e)}")
         return {"score": 0, "criteria": {}, "suggestions": ["Error scoring prompt."], "rewritten_prompt": prompt}
+
+async def enhance_prompt_text(original_prompt: str, instruction: str) -> str:
+    """Refine a prompt based on specific user feedback."""
+    try:
+        chat_completion = await client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert Prompt Engineer. Your task is to take an existing AI prompt and REFINE it based on the user's instructions. Maintain the original structure but update the content to match the request. \n\nCRITICAL:\n1. Ensure the output is an EXECUTION PROMPT that immediately completes the user's task when pasted into an LLM.\n2. DO NOT ask the AI to 'write a prompt'.\n3. Return ONLY the new master execution prompt text."
+                },
+                {
+                    "role": "user",
+                    "content": f"ORIGINAL PROMPT:\n{original_prompt}\n\nREFINEMENT INSTRUCTION: {instruction}\n\nGenerate the enhanced master execution prompt now:"
+                }
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.4,
+            max_tokens=3000
+        )
+        return chat_completion.choices[0].message.content.strip()
+    except Exception as e:
+        print("EXCEPTION enhancing prompt:", e)
+        return f"Error: Failed to enhance prompt. {str(e)}"
 
 # =========================
 # TEST PROMPT FEATURE
