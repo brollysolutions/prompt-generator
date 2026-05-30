@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import Link from "next/link";
 
 import { GradientButton } from "@/components/ui/gradient-button";
 
@@ -21,43 +20,6 @@ export default function Home() {
       overflow: "hidden",
       position: "relative"
     }}>
-      {/* Navigation for Library/History */}
-      <div style={{
-        position: "absolute",
-        top: "30px",
-        right: "40px",
-        zIndex: 100,
-        display: "flex",
-        gap: "15px"
-      }}>
-        <Link href="/library" style={{
-          textDecoration: "none",
-          background: "rgba(212, 175, 55, 0.1)",
-          border: "1px solid rgba(212, 175, 55, 0.3)",
-          color: "#AA8A27",
-          padding: "10px 20px",
-          borderRadius: "12px",
-          fontSize: "14px",
-          fontWeight: 600,
-          transition: "all 0.3s"
-        }}>
-          Library
-        </Link>
-        <Link href="/history" style={{
-          textDecoration: "none",
-          background: "rgba(212, 175, 55, 0.1)",
-          border: "1px solid rgba(212, 175, 55, 0.3)",
-          color: "#AA8A27",
-          padding: "10px 20px",
-          borderRadius: "12px",
-          fontSize: "14px",
-          fontWeight: 600,
-          transition: "all 0.3s"
-        }}>
-          History
-        </Link>
-      </div>
-
       {/* Full Page Background Waves */}
       <div className="bg-wave-container">
         <svg className="waves" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
