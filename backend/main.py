@@ -12,6 +12,7 @@ from services.groq_service import (
     generate_questions,
     generate_final_prompt,
     process_prompt_scoring,
+    enhance_prompt_text,
     test_generated_prompt
 )
 
@@ -61,9 +62,14 @@ class FinalPromptRequest(BaseModel):
     answers: dict
     questions: list = []
     target_ai: str = ""
+    caveman_mode: bool = False
 
 class TestPromptRequest(BaseModel):
     prompt: str
+
+class EnhancePromptRequest(BaseModel):
+    prompt: str
+    instruction: str
 
 
 # =========================
@@ -100,7 +106,7 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
     target_ai = data.target_ai
 
     # Generate the dynamic prompt using the imported Groq service function
-    result = await generate_final_prompt(user_input, answers, questions, target_ai)
+    result = await generate_final_prompt(user_input, answers, questions, target_ai, data.caveman_mode)
 
     return result
 
@@ -112,6 +118,15 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
 async def score_prompt_api(data: PromptScoreRequest):
     result = await process_prompt_scoring(data.prompt)
     return result
+
+# =========================
+# ENHANCE PROMPT API
+# =========================
+
+@app.post("/enhance-prompt")
+async def enhance_prompt_api(data: EnhancePromptRequest):
+    enhanced_text = await enhance_prompt_text(data.prompt, data.instruction)
+    return {"enhanced_prompt": enhanced_text}
 
 # =========================
 # TEST PROMPT API
