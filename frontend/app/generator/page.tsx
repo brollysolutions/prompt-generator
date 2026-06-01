@@ -52,47 +52,7 @@ export default function GeneratorPage() {
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(false);
 
-  const [enhanceInstruction, setEnhanceInstruction] = useState("");
-  const [loadingEnhance, setLoadingEnhance] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-
-  const handleEnhancePrompt = async () => {
-    const text =
-      finalPrompt?.smart_prompt ||
-      finalPrompt?.final_instruction ||
-      finalPrompt?.final_prompt ||
-      "";
-
-    if (!text || !enhanceInstruction.trim()) return;
-
-    try {
-      setLoadingEnhance(true);
-      const response = await fetch("http://127.0.0.1:8000/enhance-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text, instruction: enhanceInstruction }),
-      });
-      const data = await response.json();
-      
-      const updatedPrompt = {
-        ...finalPrompt,
-        smart_prompt: data.enhanced_prompt,
-        // Reset score since the content changed significantly
-        quality_score: undefined,
-        quality_breakdown: undefined,
-        quality_feedback: undefined
-      };
-      
-      setFinalPrompt(updatedPrompt);
-      setEnhanceInstruction("");
-      localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
-    } catch (error) {
-      console.error(error);
-      alert("Failed to enhance prompt.");
-    } finally {
-      setLoadingEnhance(false);
-    }
-  };
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -316,13 +276,13 @@ export default function GeneratorPage() {
             <Link 
               href="/library"
               style={{
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#6b7280",
-                background: "#f3f4f6",
-                borderRadius: "10px",
-                textDecoration: "none"
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#ffffff",
+              background: "#000000",
+              borderRadius: "10px",
+              textDecoration: "none"
               }}
             >
               Library
@@ -330,30 +290,28 @@ export default function GeneratorPage() {
             <Link 
               href="/history"
               style={{
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#6b7280",
-                background: "#f3f4f6",
-                borderRadius: "10px",
-                textDecoration: "none"
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#ffffff",
+              background: "#000000",
+              borderRadius: "10px",
+              textDecoration: "none"
               }}
             >
               History
             </Link>
-            <button 
+            <button
               onClick={() => {
-                if(confirm("Clear all your work?")) {
-                  localStorage.clear();
-                  window.location.reload();
-                }
+                localStorage.clear();
+                window.location.reload();
               }}
               style={{
                 padding: "8px 16px",
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "#6b7280",
-                background: "#f3f4f6",
+                color: "#ffffff",
+                background: "#000000",
                 border: "none",
                 borderRadius: "10px",
                 cursor: "pointer"
@@ -923,60 +881,6 @@ export default function GeneratorPage() {
                     </ReactMarkdown>
                   </div>
                 </div>
-
-                {/* AI Enhancement Section */}
-                <div style={{ 
-                  padding: "24px 32px", 
-                  background: "rgba(249, 250, 251, 0.6)", 
-                  borderTop: "1px solid #D4AF37" 
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-                    <Sparkles size={20} color="#D4AF37" />
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#000000" }}>Refine with AI</h3>
-                  </div>
-                  <div style={{ display: "flex", gap: "12px" }}>
-                    <input
-                      type="text"
-                      placeholder="e.g. 'Make it more concise' or 'Add more coding examples'..."
-                      value={enhanceInstruction}
-                      onChange={(e) => setEnhanceInstruction(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: "12px 16px",
-                        borderRadius: "12px",
-                        border: "1px solid #D4AF37",
-                        background: "#ffffff",
-                        color: "#000000",
-                        fontSize: "14px",
-                        outline: "none",
-                      }}
-                      onKeyDown={(e) => e.key === 'Enter' && handleEnhancePrompt()}
-                    />
-                    <button
-                      onClick={handleEnhancePrompt}
-                      disabled={loadingEnhance || !enhanceInstruction.trim()}
-                      style={{
-                        padding: "12px 24px",
-                        background: "#000000",
-                        color: "#ffffff",
-                        border: "none",
-                        borderRadius: "12px",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        fontSize: "14px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      {loadingEnhance ? (
-                        <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>⟳</motion.span>
-                      ) : <Sparkles size={16} />}
-                      {loadingEnhance ? "Enhancing..." : "Enhance"}
-                    </button>
-                  </div>
-                </div>
               </div>
 
               <div style={{
@@ -990,32 +894,13 @@ export default function GeneratorPage() {
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                   <Play size={24} fill="#000000" />
-                  <h2 style={{ color: "#000000", margin: 0, fontSize: "22px", fontWeight: 700 }}>🧪 Test Prompt</h2>
+                  <h2 style={{ color: "#000000", margin: 0, fontSize: "22px", fontWeight: 700 }}>Test Prompt</h2>
                 </div>
-                <button
+                <GetStartedButton
                   onClick={handleTestPrompt}
-                  disabled={loadingTest}
-                  style={{
-                    padding: "14px 28px",
-                    background: "#000000",
-                    color: "#ffffff",
-                    borderRadius: "12px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                    fontSize: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px"
-                  }}
-                >
-                  {loadingTest ? (
-                    <>
-                      <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>⟳</motion.span>
-                      AI is thinking...
-                    </>
-                  ) : "Test Instantly"}
-                </button>
+                  loading={loadingTest}
+                  text="Test Prompt"
+                />
                 
                 {testResponse && (
                   <motion.div 
@@ -1080,22 +965,22 @@ export default function GeneratorPage() {
         .parallax > use:nth-child(1) {
           animation-delay: -2s;
           animation-duration: 7s;
-          fill: rgba(255, 222, 77, 0.4);
+          fill: rgba(255, 201, 0, 0.4);
         }
         .parallax > use:nth-child(2) {
           animation-delay: -3s;
           animation-duration: 10s;
-          fill: rgba(255, 178, 44, 0.3);
+          fill: rgba(255, 225, 0, 0.3);
         }
         .parallax > use:nth-child(3) {
           animation-delay: -4s;
           animation-duration: 13s;
-          fill: rgba(248, 222, 34, 0.2);
+          fill: rgba(254, 186, 23, 0.2);
         }
         .parallax > use:nth-child(4) {
           animation-delay: -5s;
           animation-duration: 20s;
-          fill: rgba(243, 243, 243, 0.8);
+          fill: #F3F4F4;
         }
         @keyframes move-forever {
           0% {

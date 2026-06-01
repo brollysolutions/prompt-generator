@@ -79,13 +79,13 @@ export default function LibraryPage() {
             <Link 
               href="/generator"
               style={{
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#6b7280",
-                background: "#f3f4f6",
-                borderRadius: "10px",
-                textDecoration: "none"
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#ffffff",
+              background: "#000000",
+              borderRadius: "10px",
+              textDecoration: "none"
               }}
             >
               Generator
@@ -93,13 +93,13 @@ export default function LibraryPage() {
             <Link 
               href="/history"
               style={{
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#6b7280",
-                background: "#f3f4f6",
-                borderRadius: "10px",
-                textDecoration: "none"
+              padding: "8px 16px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#ffffff",
+              background: "#000000",
+              borderRadius: "10px",
+              textDecoration: "none"
               }}
             >
               History
@@ -313,22 +313,22 @@ export default function LibraryPage() {
         .parallax > use:nth-child(1) {
           animation-delay: -2s;
           animation-duration: 7s;
-          fill: rgba(255, 222, 77, 0.4);
+          fill: rgba(255, 201, 0, 0.4);
         }
         .parallax > use:nth-child(2) {
           animation-delay: -3s;
           animation-duration: 10s;
-          fill: rgba(255, 178, 44, 0.3);
+          fill: rgba(255, 225, 0, 0.3);
         }
         .parallax > use:nth-child(3) {
           animation-delay: -4s;
           animation-duration: 13s;
-          fill: rgba(248, 222, 34, 0.2);
+          fill: rgba(254, 186, 23, 0.2);
         }
         .parallax > use:nth-child(4) {
           animation-delay: -5s;
           animation-duration: 20s;
-          fill: rgba(243, 243, 243, 0.8);
+          fill: #F3F4F4;
         }
         @keyframes move-forever {
           0% {

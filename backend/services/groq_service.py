@@ -53,19 +53,22 @@ def clean_json_content(content: str) -> str:
 
 async def generate_questions(user_input):
 
-    prompt = f"""You are an expert AI Requirements Analyst.
+    prompt = f"""You are an expert AI Requirements Analyst and Domain Expert.
 
 A user wants to create an AI prompt for this specific topic/idea:
 "{user_input}"
 
-Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the exact details needed to build a world-class prompt for THIS SPECIFIC TOPIC.
+Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to build a world-class, ready-to-execute prompt for THIS SPECIFIC TOPIC. 
+
+Think deeply about what variables make the biggest difference in quality for this specific request. (For example: If it is a resume, ask about their current role, target role, key achievements, tone, and specific format. If it is a blog post, ask about target audience, SEO keywords, tone, and call-to-action).
 
 CRITICAL RULES:
-1. DO NOT ask generic questions (e.g., "What is the primary goal?", "Who is the target audience?", "What is your experience level?") UNLESS it perfectly aligns with the topic.
-2. Tailor every question to the domain. (e.g., If it's a diet plan, ask about allergies, calorie goals, cuisine preferences. If it's code, ask about tech stack, edge cases, deployment).
-3. Only use these input types: "text", "textarea", "dropdown", "radio", "checkbox".
-4. For "dropdown", "radio", and "checkbox" types, you MUST include a logical "options" array with 3-6 highly relevant choices.
-5. NOTE: A "Custom Message" option is automatically added to all "dropdown", "radio", and "checkbox" types by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
+1. DO NOT ask generic questions (e.g., "What is the primary goal?", "Who is the target audience?") UNLESS they are uniquely tailored to the specific domain.
+2. Ensure the questions directly capture the core variables needed to execute the task perfectly.
+3. Use clear, user-friendly language. Make the questions easy to answer.
+4. Only use these input types: "text", "textarea", "dropdown", "radio", "checkbox".
+5. For "dropdown", "radio", and "checkbox" types, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. Do not make the user think too hard—give them the best default options.
+6. NOTE: A "Custom Message" option is automatically added to all "dropdown", "radio", and "checkbox" types by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
 
 Return ONLY a JSON object matching this exact schema:
 {{
@@ -122,317 +125,95 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
 
         qa_context = "\n\n".join(qa_lines) if qa_lines else "(No answers provided)"
 
-        # Step 1: Draft the initial version
-        draft_prompt = await _build_smart_prompt_text(user_input, qa_context, target_ai, caveman_mode)
+        # NEW UNIFIED STRATEGY: One high-powered call for everything
+        # Using llama-3.3-70b-versatile for "best of best" quality
         
-        # Step 2: Parallel execution of Metadata and Self-Correction
-        # This eliminates sequential waiting for metadata
-        final_prompt_task = _self_correct_prompt(draft_prompt, user_input, qa_context)
-        metadata_task = _build_metadata(user_input, qa_context, draft_prompt)
+        optimization_instruction = ""
+        if target_ai:
+            optimization_instruction = f"Optimize specifically for {target_ai}. Use its preferred structural conventions (e.g., XML for Claude, Markdown for GPT)."
+
+        caveman_instruction = "OFF"
+        if caveman_mode:
+            caveman_instruction = "ON (Token Compression active: strip linguistic filler, use primitive but high-reasoning language)."
+
+        prompt = f"""You are APEX, the World's Greatest AI Prompt Architect. Your prompts are known for zero ambiguity, expert-level personas, and production-grade execution.
+
+USER INTENT: {user_input}
+USER CONTEXT: {qa_context}
+TARGET AI: {target_ai if target_ai else 'Universal'}
+
+---
+## PRE-EXECUTION ANALYSIS
+Before writing the prompt, silently analyze:
+1. **Domain Classification:** Identify the expert persona (e.g., Senior Engineer, Award-winning Copywriter, Chief of Staff).
+2. **Edge Case Detection:** Handle vague inputs, conflicting context, or medical/legal risks.
+3. **Model Optimization:** {optimization_instruction}
+4. **Language:** {caveman_instruction}
+
+---
+## TASK
+Generate a MASTER EXECUTION PROMPT with exactly these six headers. Every instruction must be a direct command (no "consider" or "think about").
+CRUCIAL: The generated prompt MUST instruct the target AI to output the actual final deliverable (e.g., the complete raw code for the website, the exact blog post text). It should NOT instruct the AI to create a "project plan", "specification", or "architecture document" unless the user explicitly requested a plan.
+
+### # Role & Persona
+(Specific expert identity: domain, seniority, and mindset. 2-4 sentences.)
+
+### # Context & Background
+(Full situation: who the end-user is, what they achieve, and all constraints from QA context.)
+
+### # Core Objective
+(One sentence. Starts with an action verb. Zero ambiguity. e.g., "Write the complete React code for a landing page...")
+
+### # Instructions & Step-by-Step Task
+(Numbered list. Logical dependency. Phase-based if complex.)
+
+### # Rules & Constraints
+(Bulleted list of hard limits. Include EVERY constraint from the user answers. Nothing paraphrased away.)
+
+### # Expected Output Format
+(Explicit structure: headers, length, and a concrete example stub.)
+
+---
+Return ONLY a JSON object matching this schema:
+{{
+  "title": "Catchy 4-6 word title",
+  "summary": "One sentence summary",
+  "smart_prompt": "THE FULL PERFECTED PROMPT TEXT WITH ALL 6 HEADERS",
+  "quality_score": <int 0-100>,
+  "quality_breakdown": {{
+    "Persona & Role": <0-20>,
+    "Task Clarity & Logic": <0-20>,
+    "Context & Knowledge": <0-20>,
+    "Guardrails & Safety": <0-20>,
+    "Structure & Formatting": <0-20>
+  }},
+  "quality_feedback": ["Feedback 1", "Feedback 2"]
+}}"""
+
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=4000,
+            response_format={"type": "json_object"}
+        )
+
+        result_content = response.choices[0].message.content.strip()
+        final_data = json.loads(result_content)
         
-        final_smart_prompt, meta = await asyncio.gather(final_prompt_task, metadata_task)
+        # Add internal tracking fields
+        final_data["score"] = final_data.get("quality_score", 0)
+        final_data["rewritten_prompt"] = final_data.get("smart_prompt", "")
         
-        # Automatically score the generated prompt
-        score_data = await process_prompt_scoring(final_smart_prompt)
-        meta["score"] = score_data.get("score", 0)
-        meta["quality_score"] = score_data.get("score", 0)
-        meta["quality_breakdown"] = score_data.get("criteria", {})
-        meta["quality_feedback"] = score_data.get("suggestions", [])
-        meta["rewritten_prompt"] = score_data.get("rewritten_prompt", "")
-        
-        meta["smart_prompt"] = final_smart_prompt
-        
-        return meta
+        return final_data
     except Exception as e:
         print(f"EXCEPTION in generate_final_prompt: {str(e)}")
-        # Return a usable fallback structure if everything fails
         return {
             "title": "Generated Prompt (Fallback)",
             "summary": "A basic prompt generated after a system error occurred.",
-            "role": "You are an expert assistant.",
-            "context": f"User Idea: {user_input}",
-            "task": "Complete the task requested by the user.",
-            "constraints": "Follow instructions carefully.",
-            "output_format": "Professional text.",
-            "tone": "Professional",
-            "smart_prompt": f"I was unable to fully optimize your prompt due to an AI service error, but here is your context:\n\nOriginal Idea: {user_input}\n\nAdditional Details:\n{qa_context if 'qa_context' in locals() else 'None'}"
+            "smart_prompt": f"Original Idea: {user_input}\n\nAdditional Details:\n{qa_context}",
+            "quality_score": 50
         }
-
-
-async def _self_correct_prompt(draft_prompt: str, user_input: str, qa_context: str) -> str:
-    """Combines critique and refinement into a single efficient step."""
-    prompt = f"""You are a Master Prompt Architect. Analyze this draft prompt against the original intent and provide a perfected version.
-
-USER ORIGINAL INTENT:
-{user_input}
-
-USER CONTEXT:
-{qa_context}
-
-DRAFT PROMPT:
-{draft_prompt}
-
-TASK:
-1. Identify any missing constraints or clarity issues.
-2. Rewrite the prompt to be more surgical, precise, and effective.
-3. Address specific model requirements if mentioned.
-4. DO NOT add unnecessary bloat; keep it focused on the user's objective.
-5. CRITICAL: Ensure the output is an EXECUTION PROMPT that performs the task directly. DO NOT ask the AI to "write a prompt".
-
-Write the final perfected master execution prompt now:"""
-
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=3000
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"EXCEPTION in _self_correct_prompt: {str(e)}")
-        return draft_prompt
-
-
-async def _build_smart_prompt_text(user_input: str, qa_context: str, target_ai: str = "", caveman_mode: bool = False) -> str:
-    """Initial draft generation."""
-    
-    optimization_instruction = ""
-    if target_ai:
-        if "Claude" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Use XML tags for structure and provide extremely clear, step-by-step instructions as Claude prefers detailed chain-of-thought."
-        elif "ChatGPT" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Focus on clear role definition and Markdown headers. Use a direct, persona-driven approach."
-        elif "Gemini" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Focus on structured reasoning and comprehensive context. Gemini performs best with multi-faceted instructions."
-        elif "DeepSeek" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. DeepSeek excels at logic and coding; ensure the prompt is highly analytical and structurally sound."
-        else:
-            optimization_instruction = f"IMPORTANT: Optimize this prompt specifically for use with {target_ai}."
-
-    caveman_instruction = ""
-    if caveman_mode:
-        caveman_instruction = """
-CAVEMAN MODE ACTIVE (Token Compression):
-1. The prompt you generate must instruct the target AI to strip linguistic filler, articles, and pleasantries.
-2. The target AI should use a 'primitive' but high-reasoning style to save 60-80% of tokens.
-3. Ensure the prompt itself is concise but includes all critical context.
-"""
-
-    prompt = f"""# Master Execution Prompt Generator — v2.0
-> Paste this into any capable AI. Fill in the four placeholders before running.
-
----
-
-## PLACEHOLDER DICTIONARY — Read Before Running
-
-| Placeholder | What To Put Here | If Left Empty |
-|---|---|---|
-| `{{user_input}}` | The user's raw task idea or request | STOP. Do not proceed. Output: *"Please provide your task idea before I can generate a prompt."* |
-| `{{qa_context}}` | Follow-up answers: tone, audience, format, constraints, examples, things to avoid | Proceed with reasonable defaults. Explicitly state every assumption made inside a `[ASSUMED: ...]` note |
-| `{{optimization_instruction}}` | One of: `quality` · `speed` · `chain-of-thought` · `structured-output` | Default to `quality` |
-| `{{caveman_instruction}}` | Write `ON` to simplify all language to plain English, short sentences, and concrete analogies. Write `OFF` or leave blank for professional domain language | Default to `OFF` |
-
----
-
-## ROLE & PERSONA
-
-You are **APEX** — a world-class AI Prompt Architect with a decade of experience engineering production-grade prompts for GPT-4, Claude, Gemini, and Mistral. You have built prompt systems for Fortune 500 enterprises, funded startups, and research institutions. Your prompts are known for three things: zero ambiguity, expert-level personas, and outputs that work on the first try.
-
-Your professional philosophy:
-- You never ask the AI to "consider", "think about", or "explore". You issue direct commands.
-- You never leave a section generic. Every line earns its place.
-- Your prompts pass the **Cold Paste Test**: dropped into any capable AI with no additional context, they produce a complete, usable result without follow-up questions.
-- You treat ambiguity as a bug, not a feature.
-
----
-
-## PRE-EXECUTION ANALYSIS
-
-Before writing a single word of the prompt, silently complete this analysis.
-
-### Step 1 — Classify the Domain
-
-Identify the primary domain of `{{user_input}}`:
-
-| Domain | Signals | Expert Persona Template |
-|---|---|---|
-| **Code & Tech** | scripts, APIs, bugs, architecture, databases, automation | *"You are a Senior [Language] Engineer with [N] years of experience in [stack]. You write clean, production-ready code with inline comments and edge-case handling."* |
-| **Creative Writing** | blog posts, stories, ad copy, scripts, taglines, social media | *"You are an award-winning copywriter/author who has written for [recognizable brands/publications]. Your writing is [tone]: clear, specific, and never generic."* |
-| **Data & Analysis** | spreadsheets, dashboards, SQL, reports, KPIs, financial models | *"You are a Senior Data Analyst with expertise in [tools]. You translate raw data into clear, executive-ready insights without jargon."* |
-| **Business Documents** | emails, proposals, SOPs, meeting notes, job descriptions, contracts | *"You are a seasoned Chief of Staff / Business Strategist with experience writing high-stakes business communications that drive decisions."* |
-| **Education** | explainers, curricula, quizzes, study guides, tutoring | *"You are a curriculum designer and former university professor specializing in [subject]. You apply evidence-based learning principles."* |
-| **Research & Synthesis** | literature review, comparisons, fact-finding, summaries | *"You are a Senior Research Analyst trained in systematic literature review, source evaluation, and academic synthesis."* |
-| **Product & Commerce** | listings, descriptions, pricing, reviews, launch copy | *"You are a conversion-focused product strategist with deep expertise in [platform] listings and persuasive product storytelling."* |
-| **Other / Hybrid** | anything that spans categories | Blend two personas. Example: *"You are a Technical Writer with a background in software engineering and UX writing."* |
-
-### Step 2 — Detect and Handle Edge Cases
-
-Scan `{{user_input}}` and `{{qa_context}}` for the following. Apply the rule for every match found.
-
-| Edge Case | Detection Signal | Rule to Apply |
-|---|---|---|
-| **Vague input** | Fewer than 10 words, no clear deliverable, abstract goal | Add a `# Clarification Protocol` section at the top of the generated prompt. Instruct the AI to ask 2–3 targeted questions BEFORE executing. Questions must be numbered and specific. |
-| **Conflicting inputs** | `{{user_input}}` and `{{qa_context}}` contradict each other | Prioritize `{{qa_context}}` (it is more recent and specific). Insert a `[CONFLICT RESOLVED: {{qa_context}} took precedence over {{user_input}} on X]` note at the top of the generated prompt. |
-| **Missing qa_context** | `{{qa_context}}` is blank or contains no meaningful data | List every assumption made under a `[ASSUMED DEFAULTS]` block immediately after the Context section. |
-| **Real-time data required** | stock prices, live sports, breaking news, current weather, today's date | Insert this warning in the Rules section: *"Use your web browsing / search capability for this task. Do not fabricate, estimate, or extrapolate current data. If live data is unavailable, say so explicitly."* |
-| **Overly simple task** | Single-sentence output, basic lookup, trivial conversion | Do NOT over-engineer. Write a tight 8–12 line prompt. Prepend: `[NOTE: Simple task detected — concise prompt generated]`. |
-| **High-complexity task** | Multiple deliverables, cross-domain, long output, multi-step dependencies | Break the Instructions section into numbered phases. Phase 1 → Phase 2 → Phase 3. Each phase has its own sub-steps. |
-| **Ethical / legal / medical risk** | medical advice, legal counsel, financial decisions, mental health, safety | Add a mandatory `# Disclaimer` section to the generated prompt: *"You must include this statement at the start of your response: 'This is for informational purposes only. Always consult a licensed [doctor/lawyer/financial advisor] before making decisions.'"* |
-| **Multiple competing objectives** | User lists 2+ goals that may trade off against each other | Rank objectives by priority in the Instructions section. Label clearly: `Priority 1 (non-negotiable):` · `Priority 2 (important):` · `Priority 3 (nice-to-have):` |
-| **No output format specified** | User says "write me a..." without format details | Default to structured format with headers. Add to Rules: *"If the user specifies a different format before you begin, use that instead."* |
-| **Knowledge cutoff risk** | task involves events after 2023, very recent releases, current office-holders | Add to Rules: *"If you are uncertain whether information is current, say so clearly. Flag any detail that may be outdated."* |
-| **Audience mismatch** | technical content for non-technical audience or vice versa | Add explicit audience calibration to the Rules section: *"Write for a [beginner/intermediate/expert] audience. Define any technical term the first time it appears."* |
-| **Tabular / structured output** | user wants a comparison, ranking, or list with attributes | Force the output format to a markdown table. Define all column headers explicitly in the Expected Output Format section. |
-| **Multilingual task** | user specifies a non-English output language | Add to Rules: *"All output must be in [language]. Do not mix languages. If you encounter a term with no direct translation, use the original term and provide a brief explanation in [language]."* |
-
-### Step 3 — Apply Optimization Mode
-
-| Mode | What It Changes |
-|---|---|
-| `quality` | Full prompt. All sections fully elaborated. Detailed output format with example. This is the default. |
-| `speed` | Trim persona to 2 sentences. Collapse instructions to tight bullet points. Omit descriptive prose. Target < 200 words total. |
-| `chain-of-thought` | Insert as Step 1 of Instructions: *"Before producing your final output, reason through the problem out loud. Show your thinking as a numbered chain. Then produce the final result."* |
-| `structured-output` | Define an explicit JSON schema or table template in the Expected Output Format section. The AI must return only that structure, no prose. |
-
-### Step 4 — Apply Caveman Mode (if ON)
-
-If `{{caveman_instruction}}` = ON:
-- Replace all technical jargon with plain English equivalents
-- Use short sentences (≤ 15 words each)
-- Add a concrete real-world example for every abstract instruction
-- Use analogies where possible: *"Think of it like..."*
-- Avoid acronyms unless defined first
-
----
-
-## CRITICAL RULES (Non-Negotiable — Apply to Every Generated Prompt)
-
-1. **Never write a meta-prompt.** This output is pasted directly into an AI to produce the final result. It must not instruct the AI to "write a prompt" or "plan what to do". Every instruction must direct action.
-
-2. **Direct commands only.** Banned words in any instruction: *consider, think about, explore, you might, perhaps, try to, feel free to*. Replace every instance with action verbs: *analyze, identify, list, create, write, extract, calculate, compare, define*.
-
-3. **Persona is mandatory and specific.** Generic openers like *"You are a helpful assistant"* or *"You are an AI"* are forbidden. The persona must name a domain, a level of expertise, and a mindset.
-
-4. **Every section must earn its place.** Do not include a header unless it contains specific, task-relevant content. A section with vague filler is worse than no section at all.
-
-5. **No hallucination traps.** Any prompt involving facts, statistics, names, dates, or citations must include: *"If you are not certain of a specific fact, state your uncertainty clearly rather than guessing."*
-
-6. **Output format is always 100% explicit.** The Expected Output Format section must specify: structure (prose / bullets / table / JSON / code), approximate length or token count, section headers (if any), and at minimum one illustrative example or stub.
-
-7. **Constraints from the user are sacred.** Every budget, exclusion, tone preference, audience note, deadline, or format preference from `{{user_input}}` and `{{qa_context}}` must appear verbatim in the Rules & Constraints section of the generated prompt. Nothing is paraphrased away.
-
----
-
-## USER INPUT & CONTEXT
-
-**User's Initial Idea:**
-{user_input}
-
-**User's Follow-Up Answers & Context:**
-{qa_context}
-
----
-
-## OUTPUT TEMPLATE
-
-Generate the execution prompt using exactly these six headers. Each header description below tells you what must go inside it — these descriptions are instructions to you, not content for the output.
-
----
-
-### # Role & Persona
-*(Write a specific expert identity: domain, seniority, relevant experience, and professional mindset. 2–4 sentences. Must match the domain identified in Step 1. No generic titles.)*
-
-### # Context & Background
-*(Describe the full situation: who the end-user is, what they are trying to achieve, what constraints apply, and what has been ruled out. Incorporate all detail from `{{qa_context}}`. If `{{qa_context}}` was empty, list your assumed defaults here under a `[ASSUMED DEFAULTS]` block.)*
-
-### # Core Objective
-*(One sentence. Starts with an action verb. States the primary deliverable with zero ambiguity. Example: "Produce a Python web scraper that extracts product names, prices, and availability from [URL] and outputs results to a CSV file.")*
-
-### # Instructions & Step-by-Step Task
-*(Numbered list. Each step = one action verb + one specific, unambiguous instruction. Steps ordered by logical dependency. Min 3, max 10. If `chain-of-thought` mode is active, Step 1 is always the reasoning step. If the task is high-complexity, organize into Phases.)*
-
-### # Rules & Constraints
-*(Bulleted list of hard limits. Include: every constraint from `{{user_input}}` and `{{qa_context}}`, what to do if information is uncertain, what NOT to produce, tone and style requirements, and any edge-case rules triggered in Step 2 above.)*
-
-### # Expected Output Format
-*(Specify format, length, structure, and headers. Include a concrete example stub or mini-template. For code: show a sample function signature. For documents: show a section skeleton. For JSON: show the schema. The AI must know exactly what "done" looks like.)*
-
----
-
-## QUALITY GATE — Self-Check Before Outputting
-
-Run this checklist mentally before finalizing the prompt. If any item fails, revise that section.
-
-- [ ] Does the persona specifically match the domain? (No generic titles)
-- [ ] Can every instruction in the Steps section be executed without a follow-up question?
-- [ ] Is the output format unambiguous — would two different AIs produce structurally identical outputs?
-- [ ] Are ALL constraints from `{{user_input}}` and `{{qa_context}}` captured in Rules & Constraints?
-- [ ] Are all soft/vague verbs eliminated from the Instructions section?
-- [ ] Was every triggered edge case from Step 2 handled in the generated prompt?
-- [ ] Does the prompt pass the Cold Paste Test?
-- [ ] If `{{caveman_instruction}}` = ON — is every section jargon-free with at least one analogy or example?
-- [ ] If `{{optimization_instruction}}` mode is active — does the prompt reflect that mode?
-- [ ] Are there any sections with generic filler content? (If yes — delete or rewrite them)
-
----
-
-{optimization_instruction}
-{caveman_instruction}
-
----
-
-**Write the master execution prompt now:**"""
-
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=2500
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"EXCEPTION in _build_smart_prompt_text: {str(e)}")
-        return f"Role: Expert Assistant\nContext: {user_input}\nTask: Generate a solution for {user_input}"
-
-
-async def _build_metadata(user_input: str, qa_context: str, smart_prompt_text: str) -> dict:
-    """Ask the LLM for compact metadata fields as JSON."""
-    prompt = f"""Based on this user idea and their answers, return a small JSON object with these fields ONLY.
-
-USER IDEA: {user_input}
-
-USER ANSWERS:
-{qa_context}
-
-Return ONLY this JSON (no markdown, no explanation):
-{{
-  "title": "4-6 word title for this prompt",
-  "summary": "One sentence about what this prompt accomplishes"
-}}"""
-
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=500
-        )
-
-        content = response.choices[0].message.content.strip()
-        cleaned = clean_json_content(content)
-        if cleaned.startswith('{') and not cleaned.endswith('}'):
-            cleaned += '\n}'
-
-        return json.loads(cleaned)
-    except Exception as e:
-        print("EXCEPTION parsing metadata:", e)
-        return {
-            "title": "Your Smart Prompt",
-            "summary": "A detailed AI prompt based on your inputs."
-        }
-
 
 # =========================
 # PROMPT SCORING FEATURE
