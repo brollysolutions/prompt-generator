@@ -40,7 +40,7 @@ export default function HistoryPage() {
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history`);
+      const response = await fetch(`http://127.0.0.1:8001/history`);
       const data = await response.json();
       setPromptHistory(data.history || []);
     } catch (error) {
@@ -55,7 +55,7 @@ export default function HistoryPage() {
       
       if (currentDraftText && sessionId) {
         try {
-          await fetch("http://127.0.0.1:8000/history", {
+          await fetch("http://127.0.0.1:8001/history", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -85,7 +85,7 @@ export default function HistoryPage() {
   const handleSaveEdit = async (id: number) => {
     if (!editBuffer.trim() || !sessionId) return;
     try {
-      await fetch("http://127.0.0.1:8000/history", {
+      await fetch("http://127.0.0.1:8001/history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

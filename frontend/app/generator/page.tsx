@@ -120,7 +120,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch("http://127.0.0.1:8000/test-prompt", {
+      const response = await fetch("http://127.0.0.1:8001/test-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
@@ -145,7 +145,7 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch("http://127.0.0.1:8000/generate-questions", {
+      const response = await fetch("http://127.0.0.1:8001/generate-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: userInput }),
@@ -178,7 +178,7 @@ export default function GeneratorPage() {
         }
       });
 
-      const response = await fetch("http://127.0.0.1:8000/generate-final-prompt", {
+      const response = await fetch("http://127.0.0.1:8001/generate-final-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,7 +195,7 @@ export default function GeneratorPage() {
       // Auto-score the generated prompt
       let scoreData = {};
       try {
-        const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
+        const scoreResponse = await fetch("http://127.0.0.1:8001/score-prompt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText }),

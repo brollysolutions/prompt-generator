@@ -153,25 +153,25 @@ Before writing the prompt, silently analyze:
 ---
 ## TASK
 Generate a MASTER EXECUTION PROMPT with exactly these six headers. Every instruction must be a direct command (no "consider" or "think about").
-CRUCIAL: The generated prompt MUST instruct the target AI to output the actual final deliverable (e.g., the complete raw code for the website, the exact blog post text). It should NOT instruct the AI to create a "project plan", "specification", or "architecture document" unless the user explicitly requested a plan.
+CRUCIAL: The generated prompt MUST instruct the target AI to output the actual final deliverable (e.g., the exact blog post text, the complete raw code, the full movie review). It should NOT instruct the AI to create a "project plan", "specification", or "architecture document" unless the user explicitly requested a plan.
 
 ### # Role & Persona
-(Specific expert identity: domain, seniority, and mindset. 2-4 sentences.)
+(Replace vague personas with credentialed ones tailored to the user's domain. e.g., "You are an award-winning film critic..." or "You are a senior software engineer...". 2-4 sentences.)
 
 ### # Context & Background
-(Full situation: who the end-user is, what they achieve, and all constraints from QA context.)
+(Full situation: who the end-user is and what they achieve. MUST include at least one concrete example of a successful output.)
 
 ### # Core Objective
-(One sentence. Starts with an action verb. Zero ambiguity. e.g., "Write the complete React code for a landing page...")
+(One sentence. Starts with an action verb. Zero ambiguity. e.g., "Write a detailed cinematic analysis..." or "Write the complete React code...")
 
 ### # Instructions & Step-by-Step Task
-(Numbered list. Logical dependency. Phase-based if complex.)
+(Numbered list using explicit action verbs like Extract, Rank, Summarize. Logical dependency. Phase-based if complex.)
 
 ### # Rules & Constraints
-(Bulleted list of hard limits. Include EVERY constraint from the user answers. Nothing paraphrased away.)
+(Bulleted list of hard limits. Include EVERY constraint from the user answers. MUST include 2-3 explicit "Do NOT" rules and a fallback behavior.)
 
 ### # Expected Output Format
-(Explicit structure: headers, length, and a concrete example stub.)
+(Explicit structure: headers, length, and an exact output schema like JSON or markdown table.)
 
 ---
 Return ONLY a JSON object matching this schema:
@@ -225,11 +225,11 @@ Evaluate the provided prompt out of 100 based on the following rigorous criteria
 Be critical: most average prompts should score between 40-60. Only truly exceptional, production-ready prompts should score above 85.
 
 CRITERIA:
-1. Persona & Role (0-20): Does it define a specific, expert persona with clear perspective?
-2. Task Clarity & Logic (0-20): Are the instructions unambiguous? Is the logic sound?
-3. Context & Knowledge (0-20): Does it provide sufficient background and reference data?
-4. Guardrails & Safety (0-20): Does it include negative constraints (what NOT to do) and edge-case handling?
-5. Structure & Formatting (0-20): Does it use clear headers, delimiters, and specify a precise output schema?
+1. Persona & Role (0-20): Replace vague personas ("You are an AI") with credentialed ones (e.g., "You are a senior software engineer with 15 years of experience in system architecture").
+2. Task Clarity & Logic (0-20): Break tasks into numbered steps with explicit action verbs (Extract, Rank, Summarize — not "help with" or "discuss").
+3. Context & Knowledge (0-20): Provide background data and include at least one concrete example of a successful output.
+4. Guardrails & Safety (0-20): Include 2–3 explicit "Do NOT" rules and a fallback behavior (e.g., "if unsure or context is missing, say...").
+5. Structure & Formatting (0-20): Use clear headers and end with an exact output schema (JSON, markdown table, or specific word count).
 
 Prompt to evaluate: 
 {prompt}
@@ -270,6 +270,13 @@ async def rewrite_prompt_step2(prompt: str, evaluation_json: dict) -> str:
 Feedback: {json.dumps(evaluation_json)}
 Original: {prompt}
 Rewrite it to be better. 
+
+Follow these specific rules for the rewrite:
+1. Replace vague personas ("You are an AI") with credentialed ones (e.g., "You are a senior X with N years of Y experience").
+2. Break the task into numbered steps with explicit action verbs (Extract, Rank, Summarize — not "help with" or "discuss").
+3. Add at least one concrete example in the Context/Background section.
+4. Write 2–3 explicit "Do NOT" rules and a fallback behavior (e.g., "if unsure, say...").
+5. End with an exact output schema (JSON, markdown table, specific word count, etc.).
 
 CRITICAL:
 1. Ensure the output is an EXECUTION PROMPT that immediately completes the user's task when pasted into an LLM.
