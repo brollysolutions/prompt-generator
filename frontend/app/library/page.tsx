@@ -217,22 +217,24 @@ export default function LibraryPage() {
                     }}>
                       {p.category}
                     </span>
-                    <button
-                      onClick={() => handleCopy(p.prompt_text, p.id)}
-                      style={{
-                        background: copiedId === p.id ? "#10b981" : "#000000",
-                        border: "none",
-                        borderRadius: "10px",
-                        padding: "6px 12px",
-                        color: "#fff",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                    >
-                      {copiedId === p.id ? "Copied!" : "Copy Prompt"}
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleCopy(p.prompt_text, p.id)}
+                        style={{
+                          background: copiedId === p.id ? "#10b981" : "#000000",
+                          border: "none",
+                          borderRadius: "10px",
+                          padding: "6px 12px",
+                          color: "#fff",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        {copiedId === p.id ? "Copied!" : "Copy Prompt"}
+                      </button>
+                    </div>
                   </div>
                   
                   <h3 style={{ color: "#000000", fontSize: "20px", fontWeight: 700, margin: 0, lineHeight: 1.3 }}>

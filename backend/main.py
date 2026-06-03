@@ -16,7 +16,16 @@ from services.groq_service import (
     test_generated_prompt,
     auto_categorize_prompt
 )
-from database import save_prompt_version, get_prompt_history, save_library_prompt, get_library_prompts
+from database import (
+    save_prompt_version, 
+    get_prompt_history, 
+    save_library_prompt, 
+    get_library_prompts, 
+    update_prompt_version, 
+    delete_prompt_version,
+    delete_version_and_library_entry,
+    delete_library_prompt
+)
 
 app = FastAPI()
 
@@ -73,6 +82,9 @@ class VersionRequest(BaseModel):
     session_id: str
     prompt_text: str
     source: str
+
+class UpdateVersionRequest(BaseModel):
+    prompt_text: str
 
 class EnhancePromptRequest(BaseModel):
     prompt: str
@@ -183,6 +195,33 @@ async def save_history_api(data: VersionRequest):
 
     return {"id": version_id}
 
+@app.put("/history/{version_id}")
+async def update_history_api(version_id: int, data: UpdateVersionRequest):
+    success = update_prompt_version(version_id, data.prompt_text)
+    if not success:
+        return JSONResponse(status_code=404, content={"message": "Version not found"})
+    
+    # Automatically update library if edited
+    try:
+        cat_data = await auto_categorize_prompt(data.prompt_text)
+        save_library_prompt(
+            name=cat_data.get("name", "Edited Prompt"),
+            prompt_text=data.prompt_text,
+            tags=cat_data.get("tags", []),
+            category=cat_data.get("category", "General")
+        )
+    except Exception as e:
+        logger.error(f"Failed to save edited version to library: {e}")
+        
+    return {"message": "Updated successfully"}
+
+@app.delete("/history/{version_id}")
+async def delete_history_api(version_id: int):
+    success = delete_version_and_library_entry(version_id)
+    if not success:
+        return JSONResponse(status_code=404, content={"message": "Version not found"})
+    return {"message": "Deleted successfully"}
+
 @app.get("/history")
 async def get_history_api():
     history = get_prompt_history()
@@ -196,6 +235,13 @@ async def get_history_api():
 async def get_library_api():
     prompts = get_library_prompts()
     return {"prompts": prompts}
+
+@app.delete("/library/{prompt_id}")
+async def delete_library_api(prompt_id: int):
+    success = delete_library_prompt(prompt_id)
+    if not success:
+        return JSONResponse(status_code=404, content={"message": "Prompt not found"})
+    return {"message": "Deleted successfully"}
 
 import asyncio
 

@@ -48,15 +48,25 @@ export default function GeneratorPage() {
   const [loadingPrompt, setLoadingPrompt] = useState(false);
   const [copied, setCopied] = useState(false);
   const [targetAi, setTargetAi] = useState("");
+  const [sessionId, setSessionId] = useState<string>("");
 
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(false);
 
   const [showDetails, setShowDetails] = useState(false);
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [editPromptBuffer, setEditPromptBuffer] = useState("");
 
   // Load from localStorage on mount
   useEffect(() => {
     const hydrate = () => {
+      let sId = localStorage.getItem("sessionId");
+      if (!sId) {
+        sId = "session_" + Date.now();
+        localStorage.setItem("sessionId", sId);
+      }
+      setSessionId(sId);
+
       const savedUserInput = localStorage.getItem("userInput");
       const savedQuestions = localStorage.getItem("questions");
       const savedAnswers = localStorage.getItem("answers");
@@ -192,6 +202,21 @@ export default function GeneratorPage() {
       
       const promptText = data.smart_prompt || data.final_instruction || data.final_prompt || "";
 
+      // Save to history
+      try {
+        await fetch("http://127.0.0.1:8001/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            prompt_text: promptText,
+            source: "generated",
+          }),
+        });
+      } catch (historyError) {
+        console.error("Failed to save to history:", historyError);
+      }
+
       // Auto-score the generated prompt
       let scoreData = {};
       try {
@@ -245,6 +270,36 @@ export default function GeneratorPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+  };
+
+  const handleSavePromptEdit = async () => {
+    if (!finalPrompt || !editPromptBuffer.trim()) return;
+    
+    const updatedPrompt = {
+      ...finalPrompt,
+      smart_prompt: editPromptBuffer,
+      final_instruction: undefined,
+      final_prompt: undefined
+    };
+    
+    setFinalPrompt(updatedPrompt);
+    localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
+    setIsEditingPrompt(false);
+    
+    // Save to history
+    try {
+      await fetch("http://127.0.0.1:8001/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          prompt_text: editPromptBuffer,
+          source: "edited (live)",
+        }),
+      });
+    } catch (historyError) {
+      console.error("Failed to save edited prompt to history:", historyError);
+    }
   };
 
   return (
@@ -771,24 +826,80 @@ export default function GeneratorPage() {
                     <span style={{ color: "#000000", fontWeight: 700 }}>Your Smart Prompt</span>
                   </div>
                   <div style={{ display: "flex", gap: "10px" }}>
-                    <button
-                      onClick={handleCopy}
-                      style={{
-                        padding: "8px 18px",
-                        background: copied ? "#10b981" : "#000000",
-                        color: "#ffffff",
-                        border: "none",
-                        borderRadius: "10px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px"
-                      }}
-                    >
-                      {copied ? <ShieldCheck size={16} /> : <Copy size={16} />}
-                      {copied ? "Copied!" : "Copy"}
-                    </button>
+                    {!isEditingPrompt ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            const text = finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "";
+                            setEditPromptBuffer(text);
+                            setIsEditingPrompt(true);
+                          }}
+                          style={{
+                            padding: "8px 18px",
+                            background: "rgba(255, 255, 255, 0.8)",
+                            border: "1px solid #D4AF37",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            color: "#AA8A27",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <Sparkles size={16} /> Edit
+                        </button>
+                        <button
+                          onClick={handleCopy}
+                          style={{
+                            padding: "8px 18px",
+                            background: copied ? "#10b981" : "#000000",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          {copied ? <ShieldCheck size={16} /> : <Copy size={16} />}
+                          {copied ? "Copied!" : "Copy"}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleSavePromptEdit}
+                          style={{
+                            padding: "8px 18px",
+                            background: "#000000",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => setIsEditingPrompt(false)}
+                          style={{
+                            padding: "8px 18px",
+                            background: "#f3f4f6",
+                            color: "#4b5563",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -875,11 +986,32 @@ export default function GeneratorPage() {
                 )}
 
                 <div style={{ padding: "28px 32px" }}>
-                  <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
-                    </ReactMarkdown>
-                  </div>
+                  {isEditingPrompt ? (
+                    <textarea
+                      value={editPromptBuffer}
+                      onChange={(e) => setEditPromptBuffer(e.target.value)}
+                      style={{
+                        width: "100%",
+                        height: "400px",
+                        padding: "20px",
+                        borderRadius: "16px",
+                        border: "2px solid #D4AF37",
+                        background: "rgba(255, 255, 255, 0.9)",
+                        color: "#000000",
+                        fontSize: "15px",
+                        lineHeight: "1.7",
+                        fontFamily: "inherit",
+                        outline: "none",
+                        resize: "vertical",
+                      }}
+                    />
+                  ) : (
+                    <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
 

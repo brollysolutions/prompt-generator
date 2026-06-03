@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Clock, RotateCcw, Edit, Maximize2, X } from "lucide-react";
+import { ArrowLeft, RotateCcw, Edit, Maximize2, X, Trash2 } from "lucide-react";
 
 type SmartPromptResult = {
   smart_prompt?: string;
@@ -22,14 +22,17 @@ export default function HistoryPage() {
   
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editBuffer, setEditBuffer] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
-    const sId = localStorage.getItem("sessionId");
-    const savedPrompt = localStorage.getItem("finalPrompt");
-    
-    if (sId) {
-      setSessionId(sId);
+    let sId = localStorage.getItem("sessionId");
+    if (!sId) {
+      sId = "session_" + Date.now();
+      localStorage.setItem("sessionId", sId);
     }
+    setSessionId(sId);
+    
+    const savedPrompt = localStorage.getItem("finalPrompt");
     
     fetchHistory();
     
@@ -49,55 +52,91 @@ export default function HistoryPage() {
   };
 
   const handleRestore = async (version: any) => {
-    if (confirm("Restore this version? This will move your current draft to history and replace it with this version.")) {
-      // 1. Save current draft to history if it exists
-      const currentDraftText = currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt;
-      
-      if (currentDraftText && sessionId) {
-        try {
-          await fetch("http://127.0.0.1:8001/history", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              session_id: sessionId,
-              prompt_text: currentDraftText,
-              source: "replaced (restore)"
-            }),
-          });
-        } catch (error) {
-          console.error("Failed to save current draft before restore", error);
-        }
-      }
+    // 1. Get the current draft text before it gets replaced
+    const currentDraftText = currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt;
+    
+    // 2. Restore the selected version to become the current draft
+    const restoredPrompt = {
+      ...currentPrompt,
+      smart_prompt: version.prompt_text,
+      final_instruction: undefined,
+      final_prompt: undefined
+    };
+    localStorage.setItem("finalPrompt", JSON.stringify(restoredPrompt));
+    setCurrentPrompt(restoredPrompt);
 
-      // 2. Restore the selected version
-      const restoredPrompt = {
-        ...currentPrompt,
-        smart_prompt: version.prompt_text,
-        final_instruction: undefined,
-        final_prompt: undefined
-      };
-      localStorage.setItem("finalPrompt", JSON.stringify(restoredPrompt));
-      setCurrentPrompt(restoredPrompt);
-      fetchHistory();
+    // 3. Save the OLD current draft to history so it becomes a historical version
+    if (currentDraftText && sessionId) {
+      try {
+        await fetch("http://127.0.0.1:8001/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            prompt_text: currentDraftText,
+            source: "replaced (restore)"
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to save current draft to history", error);
+      }
     }
+
+    // 4. Refresh the history list
+    fetchHistory();
   };
 
   const handleSaveEdit = async (id: number) => {
     if (!editBuffer.trim() || !sessionId) return;
     try {
-      await fetch("http://127.0.0.1:8001/history", {
+      setIsSavingEdit(true);
+      const response = await fetch(`http://127.0.0.1:8001/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: sessionId,
           prompt_text: editBuffer,
-          source: "edited (history)"
+          source: "edited (history)",
         }),
       });
+      
+      if (!response.ok) {
+        throw new Error("Failed to save. Server returned " + response.status);
+      }
+
+      // Update current draft as well
+      const updatedPrompt = {
+        ...currentPrompt,
+        smart_prompt: editBuffer,
+        final_instruction: undefined,
+        final_prompt: undefined
+      };
+      localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
+      setCurrentPrompt(updatedPrompt);
+
       setEditingId(null);
       fetchHistory();
     } catch (error) {
       console.error("Failed to save edited version", error);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8001/history/${id}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetchHistory();
+      } else {
+        alert("Failed to delete the version.");
+      }
+    } catch (error) {
+      console.error("Failed to delete version", error);
+      alert("An error occurred while deleting.");
     }
   };
 
@@ -231,23 +270,21 @@ export default function HistoryPage() {
                       }}>
                         {version.source}
                       </span>
-                      <span style={{ color: "#6b7280", fontSize: "13px", fontWeight: 500 }}>
-                        <Clock size={12} style={{ display: "inline", marginRight: "4px", verticalAlign: "middle" }} />
-                        {new Date(version.created_at).toLocaleString()}
-                      </span>
                     </div>
                     <div style={{ display: "flex", gap: "10px" }}>
                       {editingId === version.id ? (
                         <>
                           <button
                             onClick={() => handleSaveEdit(version.id)}
+                            disabled={isSavingEdit}
                             style={{
                               background: "#000000",
                               border: "none", borderRadius: "10px",
-                              padding: "6px 14px", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer",
+                              padding: "6px 14px", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: isSavingEdit ? "not-allowed" : "pointer",
+                              opacity: isSavingEdit ? 0.7 : 1,
                             }}
                           >
-                            Save Changes
+                            {isSavingEdit ? "Saving..." : "Save Changes"}
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
@@ -303,6 +340,18 @@ export default function HistoryPage() {
                             }}
                           >
                             <RotateCcw size={14} /> Restore
+                          </button>
+                          <button
+                            onClick={() => handleDelete(version.id)}
+                            style={{
+                              background: "rgba(239, 68, 68, 0.1)",
+                              border: "1px solid #ef4444",
+                              borderRadius: "10px",
+                              padding: "6px 14px", color: "#ef4444", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                              display: "flex", alignItems: "center", gap: "4px"
+                            }}
+                          >
+                            <Trash2 size={14} /> Delete
                           </button>
                         </>
                       )}
@@ -378,19 +427,37 @@ export default function HistoryPage() {
                 borderRadius: "20px", padding: "24px", overflowY: "auto", color: "#000000",
                 fontSize: "14px", lineHeight: "1.6", whiteSpace: "pre-wrap",
               }}>
-                {compareVersion.prompt_text}
+                {(() => {
+                  if (compareVersion.source.includes('edited')) {
+                    return compareVersion.prompt_text;
+                  }
+                  if (compareVersion.source.includes('restore')) {
+                    return currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt || "No current draft.";
+                  }
+                  return compareVersion.prompt_text;
+                })()}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
               <div style={{ color: "#AA8A27", marginBottom: "12px", fontWeight: 700, textTransform: "uppercase", fontSize: "12px" }}>
-                Historical Version ({new Date(compareVersion.created_at).toLocaleString()})
+                Historical Version
               </div>
               <div style={{
                 flex: 1, background: "rgba(249, 250, 251, 0.8)", border: "2px solid #D4AF37",
                 borderRadius: "20px", padding: "24px", overflowY: "auto", color: "#000000",
                 fontSize: "14px", lineHeight: "1.6", whiteSpace: "pre-wrap",
               }}>
-                {currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt || "No current draft."}
+                {(() => {
+                  if (compareVersion.source.includes('edited')) {
+                    const index = promptHistory.findIndex(v => v.id === compareVersion.id);
+                    const prevVersion = promptHistory[index + 1];
+                    return prevVersion ? prevVersion.prompt_text : compareVersion.prompt_text;
+                  }
+                  if (compareVersion.source.includes('restore')) {
+                    return compareVersion.prompt_text;
+                  }
+                  return compareVersion.prompt_text;
+                })()}
               </div>
             </div>
           </div>
