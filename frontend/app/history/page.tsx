@@ -24,6 +24,19 @@ export default function HistoryPage() {
   const [editBuffer, setEditBuffer] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  const fetchHistory = async (currentSessionId?: string) => {
+    const sid = currentSessionId || sessionId;
+    if (!sid) return;
+    
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/history?session_id=${sid}`);
+      const data = await response.json();
+      setPromptHistory(data.history || []);
+    } catch (error) {
+      console.error("Failed to fetch history", error);
+    }
+  };
+
   useEffect(() => {
     let sId = localStorage.getItem("sessionId");
     if (!sId) {
@@ -39,20 +52,8 @@ export default function HistoryPage() {
     if (savedPrompt) {
       setCurrentPrompt(JSON.parse(savedPrompt));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchHistory = async (currentSessionId?: string) => {
-    const sid = currentSessionId || sessionId;
-    if (!sid) return;
-    
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/history?session_id=${sid}`);
-      const data = await response.json();
-      setPromptHistory(data.history || []);
-    } catch (error) {
-      console.error("Failed to fetch history", error);
-    }
-  };
 
   const handleRestore = async (version: any) => {
     // 1. Get the current draft text before it gets replaced

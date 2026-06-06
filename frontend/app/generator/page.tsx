@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Zap, ShieldCheck, Copy, Play, X, Trash2, FileText, Sparkles, Download, Star, Calculator } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Copy, Play, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GetStartedButton } from "@/components/ui/get-started-button";
@@ -41,7 +41,7 @@ export default function GeneratorPage() {
   const router = useRouter();
   const [userInput, setUserInput] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<{ [key: number]: any }>({});
+  const [answers, setAnswers] = useState<{ [key: number]: string | string[] }>({});
   const [customAnswers, setCustomAnswers] = useState<{ [key: number]: string }>({});
   const [finalPrompt, setFinalPrompt] = useState<SmartPromptResult | null>(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -241,7 +241,6 @@ export default function GeneratorPage() {
       }
 
       // Auto-score the generated prompt
-      let scoreData = {};
       try {
         const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
           method: "POST",
@@ -249,27 +248,35 @@ export default function GeneratorPage() {
           body: JSON.stringify({ prompt: promptText }),
         });
         const fullScoreData = await scoreResponse.json();
-        scoreData = {
+        const scoreData = {
           quality_score: fullScoreData.score,
           quality_breakdown: fullScoreData.criteria,
           quality_feedback: fullScoreData.suggestions,
           rewritten_prompt: fullScoreData.rewritten_prompt
         };
+
+        // Ensure score data is correctly mapped if coming from initial generation
+        const finalData = {
+          ...data,
+          ...scoreData,
+          id: Date.now(),
+          timestamp: new Date().toISOString(),
+          user_idea: userInput,
+        };
+        
+        setFinalPrompt(finalData);
+        localStorage.setItem("finalPrompt", JSON.stringify(finalData));
       } catch (scoreError) {
         console.error("Failed to auto-score prompt:", scoreError);
+        const finalData = {
+          ...data,
+          id: Date.now(),
+          timestamp: new Date().toISOString(),
+          user_idea: userInput,
+        };
+        setFinalPrompt(finalData);
+        localStorage.setItem("finalPrompt", JSON.stringify(finalData));
       }
-
-      // Ensure score data is correctly mapped if coming from initial generation
-      const finalData = {
-        ...data,
-        ...scoreData,
-        id: Date.now(),
-        timestamp: new Date().toISOString(),
-        user_idea: userInput,
-      };
-      
-      setFinalPrompt(finalData);
-      localStorage.setItem("finalPrompt", JSON.stringify(finalData));
       
       setTimeout(() => {
         document.getElementById("smart-prompt-result")?.scrollIntoView({ behavior: "smooth" });

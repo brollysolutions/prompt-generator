@@ -18,11 +18,7 @@ export default function LibraryPage() {
   const router = useRouter();
   const [prompts, setPrompts] = useState<LibraryPrompt[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [copiedId, setCopiedId] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetchLibrary();
-  }, []);
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
   const fetchLibrary = async () => {
     try {
@@ -33,6 +29,10 @@ export default function LibraryPage() {
       console.error("Failed to fetch library", error);
     }
   };
+
+  useEffect(() => {
+    fetchLibrary();
+  }, []);
 
   const handleCopy = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
