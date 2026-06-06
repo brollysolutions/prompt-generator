@@ -55,32 +55,37 @@ async def generate_questions(user_input):
 
     prompt = f"""You are an expert AI Requirements Analyst and Domain Expert.
 
-A user wants to create an AI prompt for this specific topic/idea:
+The user wants to create an AI prompt for the following idea:
 "{user_input}"
 
-Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to build a world-class, ready-to-execute prompt for THIS SPECIFIC TOPIC. 
+Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to REFINE and FINALIZE this prompt into a world-class, production-ready execution tool. 
 
-Think deeply about what variables make the biggest difference in quality for this specific request. (For example: If it is a resume, ask about their current role, target role, key achievements, tone, and specific format. If it is a blog post, ask about target audience, SEO keywords, tone, and call-to-action).
+Think deeply about what variables make the biggest difference in quality for this specific request. 
 
 CRITICAL RULES:
 1. DO NOT ask generic questions (e.g., "What is the primary goal?", "Who is the target audience?") UNLESS they are uniquely tailored to the specific domain.
 2. Ensure the questions directly capture the core variables needed to execute the task perfectly.
-3. Use clear, user-friendly language. Make the questions easy to answer.
-4. Only use these input types: "text", "textarea", "dropdown", "radio", "checkbox".
-5. For "dropdown", "radio", and "checkbox" types, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. Do not make the user think too hard—give them the best default options.
-6. NOTE: A "Custom Message" option is automatically added to all "dropdown", "radio", and "checkbox" types by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
+3. For educational or mentorship tasks, you MUST include questions about:
+   - Time availability per week.
+   - Specific end-goal (e.g., job-seeking, side project, hobby).
+   - Preferred learning style (e.g., hands-on/coding-first, theoretical/reading, video-based).
+4. Use clear, user-friendly language. Make the questions easy to answer.
+5. ALL questions MUST use the "checkbox" type. This allows the user to select multiple relevant options.
+6. For every question, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. Do not make the user think too hard—give them the best default options.
+7. NOTE: A "Custom Message" option is automatically added to all checkbox questions by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
 
 Return ONLY a JSON object matching this exact schema:
 {{
   "questions": [
     {{
       "question": "A highly specific question related to the user's idea",
-      "type": "radio",
+      "type": "checkbox",
       "options": ["Specific Option 1", "Specific Option 2", "Specific Option 3"]
     }},
     {{
       "question": "Another specific detail needed",
-      "type": "textarea"
+      "type": "checkbox",
+      "options": ["Option A", "Option B", "Option C"]
     }}
   ]
 }}"""
@@ -101,9 +106,21 @@ Return ONLY a JSON object matching this exact schema:
         print(f"EXCEPTION generating questions: {str(e)}")
         # Return fallback questions so the UI doesn't break
         return [
-            {"question": "What is the primary goal you want to achieve with this prompt?", "type": "textarea"},
-            {"question": "Who is the target audience for the AI's response?", "type": "text"},
-            {"question": "Are there any specific constraints or things the AI should avoid?", "type": "textarea"}
+            {
+                "question": "What are the primary goals you want to achieve with this prompt?", 
+                "type": "checkbox",
+                "options": ["Automation", "Creative Content", "Data Analysis", "Educational Guidance", "Technical Problem Solving"]
+            },
+            {
+                "question": "Who is the target audience for the AI's response?", 
+                "type": "checkbox",
+                "options": ["Technical Experts", "General Public", "Small Business Owners", "Students/Learners", "Decision Makers"]
+            },
+            {
+                "question": "Which specific constraints should the AI adhere to?", 
+                "type": "checkbox",
+                "options": ["Strictly Professional Tone", "Concise Outputs", "Detailed Step-by-Step Guides", "No Technical Jargon", "Avoid Controversial Topics"]
+            }
         ]
 
 # =========================
@@ -136,7 +153,7 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
         if caveman_mode:
             caveman_instruction = "ON (Token Compression active: strip linguistic filler, use primitive but high-reasoning language)."
 
-        prompt = f"""You are APEX, the World's Greatest AI Prompt Architect. Your prompts are known for zero ambiguity, expert-level personas, and production-grade execution.
+        prompt = f"""You are the World's Greatest Expert AI Prompt Engineer. Your mission is to take a raw user idea and their specific responses to clarifying questions to craft a master execution prompt that is highly relevant, clear, and context-aware.
 
 USER INTENT: {user_input}
 USER CONTEXT: {qa_context}
@@ -144,34 +161,35 @@ TARGET AI: {target_ai if target_ai else 'Universal'}
 
 ---
 ## PRE-EXECUTION ANALYSIS
-Before writing the prompt, silently analyze:
-1. **Domain Classification:** Identify the expert persona (e.g., Senior Engineer, Award-winning Copywriter, Chief of Staff).
-2. **Edge Case Detection:** Handle vague inputs, conflicting context, or medical/legal risks.
+Before writing the prompt, perform a deep-dive analysis of the input idea and responses:
+1. **Strategic Audit:** Identify key aspects, objectives, and specific use cases.
+2. **Challenge Detection:** Pinpoint potential challenges, constraints, and "invisible variables" that could lead to ambiguity.
 3. **Model Optimization:** {optimization_instruction}
 4. **Language:** {caveman_instruction}
 
 ---
 ## TASK
-Generate a MASTER EXECUTION PROMPT with exactly these six headers. Every instruction must be a direct command (no "consider" or "think about").
-CRUCIAL: The generated prompt MUST instruct the target AI to output the actual final deliverable (e.g., the exact blog post text, the complete raw code, the full movie review). It should NOT instruct the AI to create a "project plan", "specification", or "architecture document" unless the user explicitly requested a plan.
+Based on your analysis, generate a FINAL OPTIMIZED PROMPT that can consistently produce accurate, comprehensive, and contextually high-quality output suitable for downstream AI processing. 
+
+The prompt MUST cover these six sections, avoiding all ambiguity, repetition, and irrelevant content:
 
 ### # Role & Persona
-(Replace vague personas with credentialed ones tailored to the user's domain. e.g., "You are an award-winning film critic..." or "You are a senior software engineer...". 2-4 sentences.)
+(Frame the persona as a specialized, world-class AI system. Include a "Boundary Statement" explicitly stating what the AI will NOT do. For educational tasks, include an adaptive fallback protocol.)
 
 ### # Context & Background
-(Full situation: who the end-user is and what they achieve. MUST include at least one concrete example of a successful output.)
+(Full situation including objectives and use cases. Include the detailed User/Learner Profile: time availability, specific goals, and preferred learning style. Include one concrete example of a successful output.)
 
 ### # Core Objective
-(One sentence. Starts with an action verb. Zero ambiguity. e.g., "Write a detailed cinematic analysis..." or "Write the complete React code...")
+(One sentence starting with an action verb. Clearly state the primary goal.)
 
 ### # Instructions & Step-by-Step Task
-(Numbered list using explicit action verbs like Extract, Rank, Summarize. Logical dependency. Phase-based if complex.)
+(Numbered list using explicit action verbs. For each step, include estimated duration and a specific milestone outcome.)
 
 ### # Rules & Constraints
-(Bulleted list of hard limits. Include EVERY constraint from the user answers. MUST include 2-3 explicit "Do NOT" rules and a fallback behavior.)
+(Bulleted list of hard limits. Replace vague tone rules with behavioral rules. Include 2-3 explicit "Do NOT" rules and a "Hallucination Safeguard".)
 
 ### # Expected Output Format
-(Explicit structure: headers, length, and an exact output schema like JSON or markdown table.)
+(Explicit structure for the final deliverable. Prioritize depth over brevity and specify exact schemas if necessary.)
 
 ---
 Return ONLY a JSON object matching this schema:
@@ -225,11 +243,11 @@ Evaluate the provided prompt out of 100 based on the following rigorous criteria
 Be critical: most average prompts should score between 40-60. Only truly exceptional, production-ready prompts should score above 85.
 
 CRITERIA:
-1. Persona & Role (0-20): Replace vague personas ("You are an AI") with credentialed ones (e.g., "You are a senior software engineer with 15 years of experience in system architecture").
-2. Task Clarity & Logic (0-20): Break tasks into numbered steps with explicit action verbs (Extract, Rank, Summarize — not "help with" or "discuss").
-3. Context & Knowledge (0-20): Provide background data and include at least one concrete example of a successful output.
-4. Guardrails & Safety (0-20): Include 2–3 explicit "Do NOT" rules and a fallback behavior (e.g., "if unsure or context is missing, say...").
-5. Structure & Formatting (0-20): Use clear headers and end with an exact output schema (JSON, markdown table, or specific word count).
+1. Persona & Role (0-20): Replace vague personas ("You are an AI") with credentialed ones. MUST include a Boundary Statement (what it won't do) and adaptive fallback for educational tasks.
+2. Task Clarity & Logic (0-20): Break tasks into numbered steps with explicit action verbs. MUST include estimated durations and milestone outcomes for each step.
+3. Context & Knowledge (0-20): Provide background data, include a detailed User/Learner Profile (time, goals, style), and at least one concrete example of success. For technical tasks, ensure a specific DBMS like PostgreSQL is named.
+4. Guardrails & Safety (0-20): Include 2–3 explicit "Do NOT" rules, behavioral rules instead of tone rules (including 3 MCQs per section and analogy-first fallback), and hallucination safeguards (version context + explicit hedging if unsure of syntax).
+5. Structure & Formatting (0-20): Use clear headers. Educational prompts must specify "3 MCQs with explanations and 1 mini coding challenge with expected output" per section, learning objectives per section, and prioritize depth. End with an exact output schema.
 
 Prompt to evaluate: 
 {prompt}
@@ -272,11 +290,11 @@ Original: {prompt}
 Rewrite it to be better. 
 
 Follow these specific rules for the rewrite:
-1. Replace vague personas ("You are an AI") with credentialed ones (e.g., "You are a senior X with N years of Y experience").
-2. Break the task into numbered steps with explicit action verbs (Extract, Rank, Summarize — not "help with" or "discuss").
-3. Add at least one concrete example in the Context/Background section.
-4. Write 2–3 explicit "Do NOT" rules and a fallback behavior (e.g., "if unsure, say...").
-5. End with an exact output schema (JSON, markdown table, specific word count, etc.).
+1. Replace vague personas ("You are an AI") with credentialed ones. Add a Boundary Statement (what the AI will NOT do) and adaptive fallback protocol for educational tasks.
+2. Break the task into numbered steps with explicit action verbs. Add estimated durations and milestone outcomes to each step.
+3. Add a detailed User/Learner Profile (time, goals, style) and at least one concrete example in the Context/Background section. For technical tasks, name PostgreSQL as the specific DBMS.
+4. Replace vague tone rules with behavioral rules: "Define new concepts in one plain-English sentence before use", "Include 3 MCQs per section with answer explanations", "If a concept needs re-explaining, use a real-world analogy first". Write 2–3 explicit "Do NOT" rules and a "Hallucination Safeguard" (version context + explicit hedging if unsure of syntax).
+5. Educational prompts must specify "3 MCQs with explanations and 1 mini coding challenge with expected output" per section, learning objectives per section, and prioritize depth over brevity. End with an exact output schema.
 
 CRITICAL:
 1. Ensure the output is an EXECUTION PROMPT that immediately completes the user's task when pasted into an LLM.

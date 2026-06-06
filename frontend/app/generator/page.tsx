@@ -41,7 +41,7 @@ export default function GeneratorPage() {
   const router = useRouter();
   const [userInput, setUserInput] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+  const [answers, setAnswers] = useState<{ [key: number]: any }>({});
   const [customAnswers, setCustomAnswers] = useState<{ [key: number]: string }>({});
   const [finalPrompt, setFinalPrompt] = useState<SmartPromptResult | null>(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
@@ -49,6 +49,7 @@ export default function GeneratorPage() {
   const [copied, setCopied] = useState(false);
   const [targetAi, setTargetAi] = useState("");
   const [sessionId, setSessionId] = useState<string>("");
+  const [internalPrompt, setInternalPrompt] = useState<string>("");
 
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [loadingTest, setLoadingTest] = useState(false);
@@ -74,6 +75,7 @@ export default function GeneratorPage() {
       const savedFinalPrompt = localStorage.getItem("finalPrompt");
       const savedTargetAi = localStorage.getItem("targetAi");
       const savedTestResponse = localStorage.getItem("testResponse");
+      const savedInternalPrompt = localStorage.getItem("internalPrompt");
 
       if (savedUserInput) setUserInput(savedUserInput);
       if (savedQuestions) setQuestions(JSON.parse(savedQuestions));
@@ -82,6 +84,7 @@ export default function GeneratorPage() {
       if (savedFinalPrompt) setFinalPrompt(JSON.parse(savedFinalPrompt));
       if (savedTargetAi) setTargetAi(savedTargetAi);
       if (savedTestResponse) setTestResponse(savedTestResponse);
+      if (savedInternalPrompt) setInternalPrompt(savedInternalPrompt);
     };
 
     hydrate();
@@ -116,6 +119,10 @@ export default function GeneratorPage() {
     if (testResponse) localStorage.setItem("testResponse", testResponse);
   }, [testResponse]);
 
+  useEffect(() => {
+    if (internalPrompt) localStorage.setItem("internalPrompt", internalPrompt);
+  }, [internalPrompt]);
+
 
 
   const handleTestPrompt = async () => {
@@ -130,7 +137,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch("http://127.0.0.1:8001/test-prompt", {
+      const response = await fetch("http://127.0.0.1:8000/test-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
@@ -155,13 +162,14 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch("http://127.0.0.1:8001/generate-questions", {
+      const response = await fetch("http://127.0.0.1:8000/generate-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: userInput }),
       });
       const data = await response.json();
       setQuestions(data.questions || []);
+      setInternalPrompt(data.internal_prompt || "");
     } catch (error) {
       console.error(error);
       alert("Failed to generate questions. Make sure the backend is running.");
@@ -175,20 +183,34 @@ export default function GeneratorPage() {
       setLoadingPrompt(true);
       setShowDetails(false); // Reset show details on new generation
 
-      const processedAnswers = { ...answers };
-      Object.keys(customAnswers).forEach((key) => {
+      const processedAnswers: { [key: number]: string } = {};
+      Object.keys(answers).forEach((key) => {
         const idx = parseInt(key);
-        const customText = customAnswers[idx];
-        if (customText && customText.trim()) {
-          if (processedAnswers[idx] === "Custom Message") {
-            processedAnswers[idx] = customText;
-          } else if (processedAnswers[idx]?.includes("Custom Message")) {
-            processedAnswers[idx] = processedAnswers[idx].replace("Custom Message", customText);
+        let value = answers[idx];
+        
+        // Handle array-based answers (checkboxes)
+        if (Array.isArray(value)) {
+          const customText = customAnswers[idx];
+          const hasCustom = value.includes("Custom Message");
+          const filtered = value.filter(v => v !== "Custom Message");
+          
+          if (hasCustom && customText && customText.trim()) {
+            filtered.push(customText.trim());
+          }
+          
+          processedAnswers[idx] = filtered.join(", ");
+        } else if (typeof value === "string") {
+          // Handle string-based answers (radio/text/dropdown - if any remain)
+          const customText = customAnswers[idx];
+          if (value === "Custom Message" && customText && customText.trim()) {
+            processedAnswers[idx] = customText.trim();
+          } else {
+            processedAnswers[idx] = value;
           }
         }
       });
 
-      const response = await fetch("http://127.0.0.1:8001/generate-final-prompt", {
+      const response = await fetch("http://127.0.0.1:8000/generate-final-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -196,6 +218,7 @@ export default function GeneratorPage() {
           answers: processedAnswers,
           questions,
           target_ai: targetAi,
+          internal_prompt: internalPrompt,
         }),
       });
       const data = await response.json();
@@ -204,7 +227,7 @@ export default function GeneratorPage() {
 
       // Save to history
       try {
-        await fetch("http://127.0.0.1:8001/history", {
+        await fetch("http://127.0.0.1:8000/history", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -220,7 +243,7 @@ export default function GeneratorPage() {
       // Auto-score the generated prompt
       let scoreData = {};
       try {
-        const scoreResponse = await fetch("http://127.0.0.1:8001/score-prompt", {
+        const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText }),
@@ -288,7 +311,7 @@ export default function GeneratorPage() {
     
     // Save to history
     try {
-      await fetch("http://127.0.0.1:8001/history", {
+      await fetch("http://127.0.0.1:8000/history", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -628,7 +651,7 @@ export default function GeneratorPage() {
                     {q.type === "checkbox" && q.options && q.options.length > 0 && (
                       <div style={{ marginTop: "4px" }}>
                         {q.options.map((option, i) => {
-                          const current = answers[index]?.split(", ").filter(Boolean) || [];
+                          const current = Array.isArray(answers[index]) ? answers[index] : [];
                           const checked = current.includes(option);
                           return (
                             <label key={i} style={{
@@ -642,8 +665,8 @@ export default function GeneratorPage() {
                                 onChange={(e) => {
                                   const updated = e.target.checked
                                     ? [...current, option]
-                                    : current.filter((x) => x !== option);
-                                  setAnswers({ ...answers, [index]: updated.join(", ") });
+                                    : current.filter((x: string) => x !== option);
+                                  setAnswers({ ...answers, [index]: updated });
                                 }}
                                 style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#D4AF37" }}
                               />
@@ -659,20 +682,20 @@ export default function GeneratorPage() {
                         }}>
                           <input
                             type="checkbox"
-                            checked={answers[index]?.includes("Custom Message") || false}
+                            checked={Array.isArray(answers[index]) && answers[index].includes("Custom Message")}
                             onChange={(e) => {
-                              const current = answers[index]?.split(", ").filter(Boolean) || [];
+                              const current = Array.isArray(answers[index]) ? answers[index] : [];
                               const updated = e.target.checked
                                 ? [...current, "Custom Message"]
-                                : current.filter((x) => x !== "Custom Message");
-                              setAnswers({ ...answers, [index]: updated.join(", ") });
+                                : current.filter((x: string) => x !== "Custom Message");
+                              setAnswers({ ...answers, [index]: updated });
                             }}
                             style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "#D4AF37" }}
                           />
                           Custom Message...
                         </label>
 
-                        {answers[index]?.includes("Custom Message") && (
+                        {Array.isArray(answers[index]) && answers[index].includes("Custom Message") && (
                           <input
                             type="text"
                             placeholder="Type your custom message here..."

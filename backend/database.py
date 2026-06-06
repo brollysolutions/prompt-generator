@@ -125,15 +125,24 @@ def delete_library_prompt(prompt_id: int) -> bool:
     conn.close()
     return rows_affected > 0
 
-def get_prompt_history():
+def get_prompt_history(session_id: str = None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT id, session_id, prompt_text, source, created_at
-        FROM prompt_versions
-        ORDER BY created_at DESC
-    ''')
+    
+    if session_id:
+        cursor.execute('''
+            SELECT id, session_id, prompt_text, source, created_at
+            FROM prompt_versions
+            WHERE session_id = ?
+            ORDER BY created_at DESC
+        ''', (session_id,))
+    else:
+        cursor.execute('''
+            SELECT id, session_id, prompt_text, source, created_at
+            FROM prompt_versions
+            ORDER BY created_at DESC
+        ''')
     rows = cursor.fetchall()
     history = [dict(row) for row in rows]
     conn.close()

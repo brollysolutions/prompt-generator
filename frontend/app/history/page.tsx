@@ -34,16 +34,19 @@ export default function HistoryPage() {
     
     const savedPrompt = localStorage.getItem("finalPrompt");
     
-    fetchHistory();
+    fetchHistory(sId);
     
     if (savedPrompt) {
       setCurrentPrompt(JSON.parse(savedPrompt));
     }
   }, []);
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (currentSessionId?: string) => {
+    const sid = currentSessionId || sessionId;
+    if (!sid) return;
+    
     try {
-      const response = await fetch(`http://127.0.0.1:8001/history`);
+      const response = await fetch(`http://127.0.0.1:8000/history?session_id=${sid}`);
       const data = await response.json();
       setPromptHistory(data.history || []);
     } catch (error) {
@@ -68,7 +71,7 @@ export default function HistoryPage() {
     // 3. Save the OLD current draft to history so it becomes a historical version
     if (currentDraftText && sessionId) {
       try {
-        await fetch("http://127.0.0.1:8001/history", {
+        await fetch(`http://127.0.0.1:8000/history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -90,29 +93,17 @@ export default function HistoryPage() {
     if (!editBuffer.trim() || !sessionId) return;
     try {
       setIsSavingEdit(true);
-      const response = await fetch(`http://127.0.0.1:8001/history`, {
-        method: "POST",
+      const response = await fetch(`http://127.0.0.1:8000/history/${id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: sessionId,
           prompt_text: editBuffer,
-          source: "edited (history)",
         }),
       });
       
       if (!response.ok) {
         throw new Error("Failed to save. Server returned " + response.status);
       }
-
-      // Update current draft as well
-      const updatedPrompt = {
-        ...currentPrompt,
-        smart_prompt: editBuffer,
-        final_instruction: undefined,
-        final_prompt: undefined
-      };
-      localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
-      setCurrentPrompt(updatedPrompt);
 
       setEditingId(null);
       fetchHistory();
@@ -126,7 +117,7 @@ export default function HistoryPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8001/history/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/history/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -329,18 +320,20 @@ export default function HistoryPage() {
                           >
                             <Maximize2 size={14} /> Compare
                           </button>
-                          <button
-                            onClick={() => handleRestore(version)}
-                            style={{
-                              background: "#000000",
-                              border: "none",
-                              borderRadius: "10px",
-                              padding: "6px 14px", color: "#ffffff", fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                              display: "flex", alignItems: "center", gap: "4px"
-                            }}
-                          >
-                            <RotateCcw size={14} /> Restore
-                          </button>
+                          {!version.source.includes('generated') && (
+                            <button
+                              onClick={() => handleRestore(version)}
+                              style={{
+                                background: "#000000",
+                                border: "none",
+                                borderRadius: "10px",
+                                padding: "6px 14px", color: "#ffffff", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                                display: "flex", alignItems: "center", gap: "4px"
+                              }}
+                            >
+                              <RotateCcw size={14} /> Restore
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(version.id)}
                             style={{

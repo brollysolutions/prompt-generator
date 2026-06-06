@@ -68,12 +68,9 @@ class UserInput(BaseModel):
 class PromptScoreRequest(BaseModel):
     prompt: str
 
-class FinalPromptRequest(BaseModel):
-    user_input: str
-    answers: dict
-    questions: list = []
-    target_ai: str = ""
-    caveman_mode: bool = False
+class EnhancePromptRequest(BaseModel):
+    prompt: str
+    instruction: str
 
 class TestPromptRequest(BaseModel):
     prompt: str
@@ -86,10 +83,12 @@ class VersionRequest(BaseModel):
 class UpdateVersionRequest(BaseModel):
     prompt_text: str
 
-class EnhancePromptRequest(BaseModel):
-    prompt: str
-    instruction: str
-
+class FinalPromptRequest(BaseModel):
+    user_input: str
+    answers: dict
+    questions: list = []
+    target_ai: str = ""
+    caveman_mode: bool = False
 
 # =========================
 # HOME ROUTE
@@ -109,10 +108,11 @@ def home():
 @app.post("/generate-questions")
 async def generate_questions_api(data: UserInput):
 
+    # Step 1: Generate questions based on user input
     questions = await generate_questions(data.user_input)
 
     return {
-        "questions": questions
+    "questions": questions,
     }
 
 
@@ -125,7 +125,13 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
     target_ai = data.target_ai
 
     # Generate the dynamic prompt using the imported Groq service function
-    result = await generate_final_prompt(user_input, answers, questions, target_ai, data.caveman_mode)
+    result = await generate_final_prompt(
+        user_input, 
+        answers, 
+        questions, 
+        target_ai, 
+        data.caveman_mode
+    )
 
     # Auto-categorize and save to library in the background
     try:
@@ -223,8 +229,8 @@ async def delete_history_api(version_id: int):
     return {"message": "Deleted successfully"}
 
 @app.get("/history")
-async def get_history_api():
-    history = get_prompt_history()
+async def get_history_api(session_id: str = None):
+    history = get_prompt_history(session_id)
     return {"history": history}
 
 # =========================
@@ -242,31 +248,3 @@ async def delete_library_api(prompt_id: int):
     if not success:
         return JSONResponse(status_code=404, content={"message": "Prompt not found"})
     return {"message": "Deleted successfully"}
-
-import asyncio
-
-@app.get("/migrate-history")
-async def migrate_history_api():
-    history = get_prompt_history()
-    existing_library = get_library_prompts()
-    existing_texts = {p['prompt_text'] for p in existing_library}
-    
-    migrated = 0
-    for h in history:
-        text = h['prompt_text']
-        if text and text not in existing_texts:
-            try:
-                cat_data = await auto_categorize_prompt(text)
-                save_library_prompt(
-                    name=cat_data.get("name", "Migrated Prompt"),
-                    prompt_text=text,
-                    tags=cat_data.get("tags", []),
-                    category=cat_data.get("category", "General")
-                )
-                existing_texts.add(text)
-                migrated += 1
-                await asyncio.sleep(1) # delay to prevent rate limits
-            except Exception as e:
-                logger.error(f"Failed to migrate prompt: {e}")
-                
-    return {"message": f"Successfully categorized and migrated {migrated} historical prompts to your Library!"}
