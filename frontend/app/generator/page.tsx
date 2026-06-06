@@ -186,7 +186,7 @@ export default function GeneratorPage() {
       const processedAnswers: { [key: number]: string } = {};
       Object.keys(answers).forEach((key) => {
         const idx = parseInt(key);
-        let value = answers[idx];
+        const value = answers[idx];
         
         // Handle array-based answers (checkboxes)
         if (Array.isArray(value)) {

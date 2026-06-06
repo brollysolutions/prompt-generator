@@ -18,7 +18,7 @@ export default function LibraryPage() {
   const router = useRouter();
   const [prompts, setPrompts] = useState<LibraryPrompt[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const fetchLibrary = async () => {
     try {
@@ -31,7 +31,10 @@ export default function LibraryPage() {
   };
 
   useEffect(() => {
-    fetchLibrary();
+    const init = async () => {
+      await fetchLibrary();
+    };
+    init();
   }, []);
 
   const handleCopy = (text: string, id: number) => {

@@ -11,14 +11,22 @@ type SmartPromptResult = {
   final_prompt?: string;
 };
 
+interface HistoryItem {
+  id: number;
+  session_id: string;
+  prompt_text: string;
+  source: string;
+  timestamp: string;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string>("");
-  const [promptHistory, setPromptHistory] = useState<any[]>([]);
+  const [promptHistory, setPromptHistory] = useState<HistoryItem[]>([]);
   const [currentPrompt, setCurrentPrompt] = useState<SmartPromptResult | null>(null);
   
   const [isComparing, setIsComparing] = useState(false);
-  const [compareVersion, setCompareVersion] = useState<any | null>(null);
+  const [compareVersion, setCompareVersion] = useState<HistoryItem | null>(null);
   
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editBuffer, setEditBuffer] = useState("");
@@ -38,24 +46,27 @@ export default function HistoryPage() {
   };
 
   useEffect(() => {
-    let sId = localStorage.getItem("sessionId");
-    if (!sId) {
-      sId = "session_" + Date.now();
-      localStorage.setItem("sessionId", sId);
-    }
-    setSessionId(sId);
-    
-    const savedPrompt = localStorage.getItem("finalPrompt");
-    
-    fetchHistory(sId);
-    
-    if (savedPrompt) {
-      setCurrentPrompt(JSON.parse(savedPrompt));
-    }
+    const init = async () => {
+      let sId = localStorage.getItem("sessionId");
+      if (!sId) {
+        sId = "session_" + Date.now();
+        localStorage.setItem("sessionId", sId);
+      }
+      setSessionId(sId);
+      
+      const savedPrompt = localStorage.getItem("finalPrompt");
+      
+      await fetchHistory(sId);
+      
+      if (savedPrompt) {
+        setCurrentPrompt(JSON.parse(savedPrompt));
+      }
+    };
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRestore = async (version: any) => {
+  const handleRestore = async (version: HistoryItem) => {
     // 1. Get the current draft text before it gets replaced
     const currentDraftText = currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt;
     
