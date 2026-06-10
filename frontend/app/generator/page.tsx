@@ -1045,6 +1045,7 @@ export default function GeneratorPage() {
                 </div>
               </div>
 
+              {/* IN-APP PROMPT TESTER DISABLED FOR LIVE TESTING
               <div style={{
                 marginTop: "30px",
                 background: "rgba(255, 255, 255, 0.7)",
@@ -1089,6 +1090,7 @@ export default function GeneratorPage() {
                   </motion.div>
                 )}
               </div>
+              */}
             </motion.div>
           )}
         </motion.div>
