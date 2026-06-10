@@ -1,8 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer
 import logging
+import os
+import jwt
+from datetime import datetime, timedelta
+from passlib.context import CryptContext
+from dotenv import load_dotenv
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,10 +34,49 @@ from database import (
     update_prompt_version, 
     delete_prompt_version,
     delete_version_and_library_entry,
-    delete_library_prompt
+    delete_library_prompt,
+    create_user,
+    get_user_by_email
 )
 
 app = FastAPI()
+
+# =========================
+# Auth Configuration
+# =========================
+JWT_SECRET = os.getenv("JWT_SECRET", "fallback_secret_for_dev_only")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
+
+# Use pbkdf2_sha256 for better compatibility
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user = get_user_by_email(email)
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 # =========================
 # CORS - Robust Configuration
@@ -248,3 +297,77 @@ async def delete_library_api(prompt_id: int):
     if not success:
         return JSONResponse(status_code=404, content={"message": "Prompt not found"})
     return {"message": "Deleted successfully"}
+
+
+# =========================
+# NEW AUTH ENDPOINTS
+# =========================
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+class GoogleAuthRequest(BaseModel):
+    credential: str
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
+@app.post("/auth/google")
+async def google_auth(data: GoogleAuthRequest):
+    try:
+        # Verify the Google token
+        idinfo = id_token.verify_oauth2_token(data.credential, requests.Request(), GOOGLE_CLIENT_ID)
+        
+        email = idinfo['email']
+        
+        # Check if user exists
+        user = get_user_by_email(email)
+        if not user:
+            # Create a new user with a sentinel password
+            user_id = create_user(email, "!GOOGLE_AUTH_USER")
+            if user_id == -1:
+                raise HTTPException(status_code=500, detail="Failed to create user from Google account")
+            user = {"id": user_id, "email": email}
+        
+        # Issue our JWT
+        access_token = create_access_token(data={"sub": email})
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer", 
+            "user_id": user["id"], 
+            "email": email
+        }
+    except ValueError:
+        # Invalid token
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    except Exception as e:
+        logger.error(f"Google auth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/signup")
+async def signup(data: AuthRequest):
+    user = get_user_by_email(data.email)
+    if user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(data.password)
+    user_id = create_user(data.email, hashed_password)
+    
+    if user_id == -1:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+        
+    access_token = create_access_token(data={"sub": data.email})
+    return {"access_token": access_token, "token_type": "bearer", "user_id": user_id, "email": data.email}
+
+@app.post("/login")
+async def login(data: AuthRequest):
+    user = get_user_by_email(data.email)
+    if not user or not verify_password(data.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    access_token = create_access_token(data={"sub": data.email})
+    return {"access_token": access_token, "token_type": "bearer", "user_id": user["id"], "email": user["email"]}
+
+@app.get("/me")
+async def read_users_me(current_user: dict = Depends(get_current_user)):
+    return {"id": current_user["id"], "email": current_user["email"]}

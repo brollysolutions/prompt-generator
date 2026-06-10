@@ -3,7 +3,19 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, RotateCcw, Edit, Maximize2, X, Trash2 } from "lucide-react";
+import { RotateCcw, Edit, Maximize2, X, Trash2, User, Settings, LogOut, Key, Save, Edit2, ChevronDown } from "lucide-react";
+
+const PROVIDER_MODELS: Record<string, string[]> = {
+  "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
+  "Claude": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+  "OpenAI(chat gpt)": ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
+  "Google Gemini": ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"],
+  "Cohere Dashboard": ["command-r-plus", "command-r"],
+  "Perplexity API": ["llama-3-sonar-large-32k-online", "llama-3-sonar-small-32k-online"],
+  "Hugging Face Inference Provider": ["meta-llama/Meta-Llama-3-8B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
+};
+import { useAuth } from "@/context/AuthContext";
+import { motion, AnimatePresence } from "framer-motion";
 
 type SmartPromptResult = {
   smart_prompt?: string;
@@ -21,6 +33,7 @@ interface HistoryItem {
 
 export default function HistoryPage() {
   const router = useRouter();
+  const { user, loading: authLoading, logout } = useAuth();
   const [sessionId, setSessionId] = useState<string>("");
   const [promptHistory, setPromptHistory] = useState<HistoryItem[]>([]);
   const [currentPrompt, setCurrentPrompt] = useState<SmartPromptResult | null>(null);
@@ -31,6 +44,51 @@ export default function HistoryPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editBuffer, setEditBuffer] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsApiKey, setSettingsApiKey] = useState("");
+  const [settingsApiProvider, setSettingsApiProvider] = useState("");
+  const [settingsApiModel, setSettingsApiModel] = useState("");
+  const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
+
+  // Load configuration for settings
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+      setIsEditingSettingsKey(false);
+    }
+  }, [isSettingsOpen]);
+
+  const handleSaveSettingsKey = () => {
+    const trimmedKey = settingsApiKey.trim();
+    if (trimmedKey && trimmedKey !== "free") {
+      if (!settingsApiProvider) {
+        alert("Please select an API provider.");
+        return;
+      }
+      if (!settingsApiModel) {
+        alert("Please select a model.");
+        return;
+      }
+      localStorage.setItem("user_api_key", trimmedKey);
+      localStorage.setItem("user_api_provider", settingsApiProvider);
+      localStorage.setItem("user_api_model", settingsApiModel);
+    } else {
+      localStorage.setItem("user_api_key", "free");
+      localStorage.setItem("user_api_provider", "free");
+      localStorage.setItem("user_api_model", "free");
+    }
+    setIsEditingSettingsKey(false);
+  };
+
+  // Auth protection
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   const fetchHistory = async (currentSessionId?: string) => {
     const sid = currentSessionId || sessionId;
@@ -66,82 +124,94 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRestore = async (version: HistoryItem) => {
-    // 1. Get the current draft text before it gets replaced
-    const currentDraftText = currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt;
-    
-    // 2. Restore the selected version to become the current draft
-    const restoredPrompt = {
-      ...currentPrompt,
-      smart_prompt: version.prompt_text,
-      final_instruction: undefined,
-      final_prompt: undefined
-    };
-    localStorage.setItem("finalPrompt", JSON.stringify(restoredPrompt));
-    setCurrentPrompt(restoredPrompt);
-
-    // 3. Save the OLD current draft to history so it becomes a historical version
-    if (currentDraftText && sessionId) {
-      try {
-        await fetch(`http://127.0.0.1:8000/history`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: sessionId,
-            prompt_text: currentDraftText,
-            source: "replaced (restore)"
-          }),
-        });
-      } catch (error) {
-        console.error("Failed to save current draft to history", error);
-      }
-    }
-
-    // 4. Refresh the history list
-    fetchHistory();
-  };
-
-  const handleSaveEdit = async (id: number) => {
-    if (!editBuffer.trim() || !sessionId) return;
+  const handleSaveEdit = async (versionId: number) => {
     try {
       setIsSavingEdit(true);
-      const response = await fetch(`http://127.0.0.1:8000/history/${id}`, {
-        method: "PUT",
+      const response = await fetch(`http://127.0.0.1:8000/history`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ 
+          session_id: sessionId,
           prompt_text: editBuffer,
+          source: "edited (history)"
         }),
       });
-      
-      if (!response.ok) {
-        throw new Error("Failed to save. Server returned " + response.status);
+      if (response.ok) {
+        setEditingId(null);
+        await fetchHistory();
+      } else {
+        alert("Failed to save changes.");
       }
-
-      setEditingId(null);
-      fetchHistory();
     } catch (error) {
-      console.error("Failed to save edited version", error);
-      alert("Failed to save changes. Please try again.");
+      console.error(error);
+      alert("Error saving changes.");
     } finally {
       setIsSavingEdit(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (versionId: number) => {
+    if (!window.confirm("Are you sure you want to delete this version?")) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/history/${versionId}`, {
         method: "DELETE",
       });
       if (response.ok) {
-        fetchHistory();
+        await fetchHistory();
       } else {
-        alert("Failed to delete the version.");
+        alert("Failed to delete version.");
       }
     } catch (error) {
-      console.error("Failed to delete version", error);
-      alert("An error occurred while deleting.");
+      console.error(error);
+      alert("Error deleting version.");
     }
   };
+
+  const handleRestore = async (version: HistoryItem) => {
+    try {
+      let promptToRestore = version.prompt_text;
+      
+      const index = promptHistory.findIndex(v => v.id === version.id);
+      const prevVersion = promptHistory[index + 1];
+      if (prevVersion) {
+        promptToRestore = prevVersion.prompt_text;
+      }
+
+      // Create a new version for the restore action
+      const response = await fetch(`http://127.0.0.1:8000/history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          session_id: sessionId,
+          prompt_text: promptToRestore,
+          source: "restored"
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create history entry for restore");
+      }
+
+      const updatedPrompt = {
+        smart_prompt: promptToRestore
+      };
+      localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
+      setCurrentPrompt(updatedPrompt);
+      await fetchHistory();
+      alert("Prompt version restored! Go to the Generator page to see it.");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to restore version.");
+    }
+  };
+
+  if (authLoading) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#000", background: "#F3F4F4" }}>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div style={{
@@ -161,13 +231,7 @@ export default function HistoryPage() {
         zIndex: 100,
         boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
       }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button 
-            onClick={() => router.push("/")}
-            style={{ display: "flex", alignItems: "center", gap: "8px", background: "none", border: "none", cursor: "pointer", color: "#D4AF37", fontWeight: 700 }}
-          >
-            <ArrowLeft size={20} /> Back to Home
-          </button>
+        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <Link 
               href="/generator"
@@ -197,6 +261,82 @@ export default function HistoryPage() {
             >
               Library
             </Link>
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "8px",
+                  background: "rgba(212, 175, 55, 0.1)",
+                  border: "1px solid #D4AF37",
+                  borderRadius: "50%",
+                  cursor: "pointer",
+                  color: "#AA8A27"
+                }}
+              >
+                <User size={18} />
+              </button>
+              {isProfileOpen && (
+                <div style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: "8px",
+                  background: "#fff",
+                  border: "1px solid #eaeaea",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  minWidth: "120px",
+                  zIndex: 101
+                }}>
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "10px 16px",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "#333",
+                      textAlign: "left",
+                      borderBottom: "1px solid #eaeaea"
+                    }}
+                  >
+                    <Settings size={16} /> Settings
+                  </button>
+                  <button
+                    onClick={logout}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "10px 16px",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "#e11d48",
+                      textAlign: "left"
+                    }}
+                  >
+                    <LogOut size={16} /> Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -432,15 +572,7 @@ export default function HistoryPage() {
                 borderRadius: "20px", padding: "24px", overflowY: "auto", color: "#000000",
                 fontSize: "14px", lineHeight: "1.6", whiteSpace: "pre-wrap",
               }}>
-                {(() => {
-                  if (compareVersion.source.includes('edited')) {
-                    return compareVersion.prompt_text;
-                  }
-                  if (compareVersion.source.includes('restore')) {
-                    return currentPrompt?.smart_prompt || currentPrompt?.final_instruction || currentPrompt?.final_prompt || "No current draft.";
-                  }
-                  return compareVersion.prompt_text;
-                })()}
+                {compareVersion.prompt_text}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -453,15 +585,9 @@ export default function HistoryPage() {
                 fontSize: "14px", lineHeight: "1.6", whiteSpace: "pre-wrap",
               }}>
                 {(() => {
-                  if (compareVersion.source.includes('edited')) {
-                    const index = promptHistory.findIndex(v => v.id === compareVersion.id);
-                    const prevVersion = promptHistory[index + 1];
-                    return prevVersion ? prevVersion.prompt_text : compareVersion.prompt_text;
-                  }
-                  if (compareVersion.source.includes('restore')) {
-                    return compareVersion.prompt_text;
-                  }
-                  return compareVersion.prompt_text;
+                  const index = promptHistory.findIndex(v => v.id === compareVersion.id);
+                  const prevVersion = promptHistory[index + 1];
+                  return prevVersion ? prevVersion.prompt_text : compareVersion.prompt_text;
                 })()}
               </div>
             </div>
@@ -469,6 +595,274 @@ export default function HistoryPage() {
         </div>
       )}
 
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div style={{
+            position: "fixed",
+            top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0, 0, 0, 0.4)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{
+                background: "#ffffff",
+                border: "1px solid rgba(212, 175, 55, 0.3)",
+                borderRadius: "24px",
+                padding: "32px",
+                width: "100%",
+                maxWidth: "450px",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                position: "relative"
+              }}
+            >
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                style={{
+                  position: "absolute",
+                  top: "20px",
+                  right: "20px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9CA3AF"
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                <div style={{
+                  width: "48px", height: "48px",
+                  background: "rgba(212, 175, 55, 0.1)",
+                  borderRadius: "12px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 16px",
+                  color: "#AA8A27"
+                }}>
+                  <Key size={24} />
+                </div>
+                <h2 style={{ color: "#000000", fontSize: "24px", fontWeight: 800, margin: 0 }}>Settings</h2>
+                <p style={{ color: "#6B7280", fontSize: "14px", marginTop: "4px" }}>Manage your account preferences</p>
+              </div>
+
+            <div style={{ marginBottom: "24px" }}>
+              <label style={{
+                display: "block",
+                color: "#374151",
+                fontSize: "13px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "8px"
+              }}>
+                API Configuration
+              </label>
+              
+              <div style={{
+                background: "#F9FAFB",
+                border: "1px solid #E5E7EB",
+                borderRadius: "12px",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px"
+              }}>
+                {isEditingSettingsKey ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div style={{ position: "relative" }}>
+                      <select
+                        value={settingsApiProvider}
+                        onChange={(e) => {
+                          setSettingsApiProvider(e.target.value);
+                          setSettingsApiModel("");
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 32px 10px 12px",
+                          borderRadius: "8px",
+                          border: "2px solid #D4AF37",
+                          fontSize: "14px",
+                          outline: "none",
+                          appearance: "none",
+                          background: "#ffffff",
+                          color: settingsApiProvider === "" ? "#9CA3AF" : "#000000"
+                        }}
+                      >
+                        <option value="" disabled hidden>Enter the API Name</option>
+                        {Object.keys(PROVIDER_MODELS).map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#9CA3AF" }} />
+                    </div>
+
+                    <div style={{ position: "relative" }}>
+                      <select
+                        value={settingsApiModel}
+                        onChange={(e) => setSettingsApiModel(e.target.value)}
+                        disabled={!settingsApiProvider}
+                        style={{
+                          width: "100%",
+                          padding: "10px 32px 10px 12px",
+                          borderRadius: "8px",
+                          border: "2px solid #D4AF37",
+                          fontSize: "14px",
+                          outline: "none",
+                          appearance: "none",
+                          background: !settingsApiProvider ? "#F3F4F6" : "#ffffff",
+                          color: settingsApiModel === "" ? "#9CA3AF" : "#000000"
+                        }}
+                      >
+                        <option value="" disabled hidden>
+                          {!settingsApiProvider ? "Select a provider first" : "Enter the Model"}
+                        </option>
+                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#9CA3AF" }} />
+                    </div>
+
+                    <input
+                      type="text"
+                      value={settingsApiKey}
+                      onChange={(e) => setSettingsApiKey(e.target.value)}
+                      placeholder="Enter API Key (or leave empty for 'free')"
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: "8px",
+                        border: "2px solid #D4AF37",
+                        fontSize: "14px",
+                        outline: "none",
+                        boxSizing: "border-box",
+                        color: "#000"
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={handleSaveSettingsKey}
+                        style={{
+                          flex: 1,
+                          background: "#000000",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "8px",
+                          padding: "8px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <Save size={14} /> Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditingSettingsKey(false);
+                          setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+                          setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+                          setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+                        }}
+                        style={{
+                          flex: 1,
+                          background: "#ffffff",
+                          color: "#4B5563",
+                          border: "1px solid #E5E7EB",
+                          borderRadius: "8px",
+                          padding: "8px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#6B7280", textTransform: "uppercase", fontWeight: 700 }}>Provider</div>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
+                          {localStorage.getItem("user_api_provider") === "free" ? "Free Shared" : localStorage.getItem("user_api_provider") || "Not Set"}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsEditingSettingsKey(true)}
+                        style={{
+                          background: "rgba(212, 175, 55, 0.1)",
+                          color: "#AA8A27",
+                          border: "none",
+                          borderRadius: "8px",
+                          padding: "8px 12px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <Edit2 size={14} /> Edit
+                      </button>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#6B7280", textTransform: "uppercase", fontWeight: 700 }}>Model</div>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
+                        {localStorage.getItem("user_api_model") === "free" ? "Free Shared" : localStorage.getItem("user_api_model") || "Not Set"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#6B7280", textTransform: "uppercase", fontWeight: 700 }}>API Key</div>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827", fontFamily: "monospace" }}>
+                        {localStorage.getItem("user_api_key") === "free" ? "Free Shared Key" : localStorage.getItem("user_api_key") ? "••••••••" + (localStorage.getItem("user_api_key") || "").slice(-4) : "Not Set"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                style={{
+                  width: "100%",
+                  background: "#F3F4F6",
+                  color: "#4B5563",
+                  border: "none",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#E5E7EB"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "#F3F4F6"}
+              >
+                Close
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }

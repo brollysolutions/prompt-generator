@@ -42,7 +42,7 @@ class SmartPromptUser(HttpUser):
     """
 
     # Designed Prompt for Final Prompt Generation
-    FINAL_PROMPT_GENERATION_PROMPT = """
+    FINAL_PROMPT_GENERATION_PROMPT = """    
     Act as an expert AI prompt engineer and design a prompt that takes an input idea and responses from the generated questions and generate a set of highly relevant, clear, and context-aware Prompt. 
     
     ### # Context
