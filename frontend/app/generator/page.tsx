@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Copy, Play, Sparkles, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { GetStartedButton } from "@/components/ui/get-started-button";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { useAuth } from "@/context/AuthContext";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -13,12 +19,6 @@ const PROVIDER_MODELS: Record<string, string[]> = {
   "Perplexity API": ["llama-3-sonar-large-32k-online", "llama-3-sonar-small-32k-online"],
   "Hugging Face Inference Provider": ["meta-llama/Meta-Llama-3-8B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
 };
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { GetStartedButton } from "@/components/ui/get-started-button";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useAuth } from "@/context/AuthContext";
 
 type Question = {
   question: string;

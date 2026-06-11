@@ -7,3 +7,4 @@ passlib[bcrypt]
 pyjwt
 bcrypt
 google-auth
+gunicorn

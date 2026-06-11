@@ -2,7 +2,7 @@ import sqlite3
 import json
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "prompt_scores.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "prompt_scores.db"))
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)

@@ -7,6 +7,7 @@ interface GetStartedButtonProps {
   disabled?: boolean;
   loading?: boolean;
   text?: string;
+  loadingText?: string;
   className?: string;
 }
 
@@ -15,6 +16,7 @@ export function GetStartedButton({
   disabled, 
   loading, 
   text = "Get Started",
+  loadingText = "Thinking...",
   className 
 }: GetStartedButtonProps) {
   return (
@@ -31,7 +33,7 @@ export function GetStartedButton({
         {loading ? (
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Thinking...
+            {loadingText}
           </div>
         ) : text}
       </span>

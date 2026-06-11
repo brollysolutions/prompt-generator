@@ -1,11 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    turbopack: {
-      root: "../../",
-    },
-  },
+  output: "standalone",
+  basePath: "/prompt_generator",
 };
 
 export default nextConfig;

@@ -39,7 +39,7 @@ from database import (
     get_user_by_email
 )
 
-app = FastAPI()
+app = FastAPI(root_path="/prompt_generator")
 
 # =========================
 # Auth Configuration
