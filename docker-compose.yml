@@ -21,7 +21,7 @@ services:
     ports:
       - "3006:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8006/prompt_generator
+      - NEXT_PUBLIC_API_URL=http://localhost:8006/prompt_generator/api
     depends_on:
       - backend
     restart: always

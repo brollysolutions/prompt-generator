@@ -40,7 +40,7 @@ from database import (
     get_user_by_email
 )
 
-app = FastAPI(root_path="/prompt_generator")
+app = FastAPI(root_path="/prompt_generator/api")
 
 # Add ProxyHeadersMiddleware to trust X-Forwarded-Proto headers from proxy
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
