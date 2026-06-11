@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, Edit, Maximize2, X, Trash2, User, Settings, LogOut, Key, Save, Edit2, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_URL } from "@/lib/api_config";
+import { API_URL } from "../../lib/api_config";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
