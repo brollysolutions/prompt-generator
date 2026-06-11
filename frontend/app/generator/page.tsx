@@ -185,7 +185,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch("http://127.0.0.1:8000/test-prompt", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/test-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
@@ -210,7 +210,7 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch("http://127.0.0.1:8000/generate-questions", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: userInput }),
@@ -258,7 +258,7 @@ export default function GeneratorPage() {
         }
       });
 
-      const response = await fetch("http://127.0.0.1:8000/generate-final-prompt", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-final-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -275,7 +275,7 @@ export default function GeneratorPage() {
 
       // Save to history
       try {
-        await fetch("http://127.0.0.1:8000/history", {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -290,7 +290,7 @@ export default function GeneratorPage() {
 
       // Auto-score the generated prompt
       try {
-        const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
+        const scoreResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/score-prompt`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText }),
@@ -366,7 +366,7 @@ export default function GeneratorPage() {
     
     // Save to history
     try {
-      await fetch("http://127.0.0.1:8000/history", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
