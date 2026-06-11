@@ -9,6 +9,7 @@ import { GetStartedButton } from "@/components/ui/get-started-button";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/lib/api";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],

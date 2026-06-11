@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ShieldCheck, ArrowRight, Mail, Lock, House, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
+import { API_URL } from "@/lib/api";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -33,8 +34,13 @@ export default function LoginPage() {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     setLoading(true);
     setError("");
+    
+    // Debug log to check the API URL in the production console
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://brollysolutions.in/prompt_generator/api";
+    console.log("Using API URL:", apiUrl);
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+      const response = await fetch(`${apiUrl}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential }),
