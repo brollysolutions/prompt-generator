@@ -1,13 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
 import { GradientButton } from "@/components/ui/gradient-button";
 
 export default function Home() {
-  const router = useRouter();
-
   return (
     <div style={{
       minHeight: "100vh",
