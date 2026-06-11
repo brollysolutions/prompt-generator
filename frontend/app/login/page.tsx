@@ -33,8 +33,13 @@ export default function LoginPage() {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     setLoading(true);
     setError("");
+    
+    // Debug log to check the API URL in the production console
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://brollysolutions.in/prompt_generator/api";
+    console.log("Using API URL:", apiUrl);
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+      const response = await fetch(`${apiUrl}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential }),
