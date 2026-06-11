@@ -6,6 +6,7 @@ import { Copy, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown } from "
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { API_URL } from "@/lib/api_config";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -80,7 +81,7 @@ export default function LibraryPage() {
 
   const fetchLibrary = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/library");
+      const response = await fetch(`${API_URL}/library`);
       const data = await response.json();
       setPrompts(data.prompts || []);
     } catch (error) {

@@ -9,6 +9,7 @@ import { GetStartedButton } from "@/components/ui/get-started-button";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/lib/api_config";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -185,7 +186,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch("http://127.0.0.1:8000/test-prompt", {
+      const response = await fetch(`${API_URL}/test-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
@@ -210,7 +211,7 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch("http://127.0.0.1:8000/generate-questions", {
+      const response = await fetch(`${API_URL}/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: userInput }),
@@ -258,7 +259,7 @@ export default function GeneratorPage() {
         }
       });
 
-      const response = await fetch("http://127.0.0.1:8000/generate-final-prompt", {
+      const response = await fetch(`${API_URL}/generate-final-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -275,7 +276,7 @@ export default function GeneratorPage() {
 
       // Save to history
       try {
-        await fetch("http://127.0.0.1:8000/history", {
+        await fetch(`${API_URL}/history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -290,7 +291,7 @@ export default function GeneratorPage() {
 
       // Auto-score the generated prompt
       try {
-        const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
+        const scoreResponse = await fetch(`${API_URL}/score-prompt`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText }),
@@ -343,8 +344,7 @@ export default function GeneratorPage() {
       finalPrompt?.final_instruction ||
       finalPrompt?.final_prompt ||
       "";
-    const markdownText = "```markdown\n" + text + "\n```";
-    navigator.clipboard.writeText(markdownText).then(() => {
+    navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
@@ -366,7 +366,7 @@ export default function GeneratorPage() {
     
     // Save to history
     try {
-      await fetch("http://127.0.0.1:8000/history", {
+      await fetch(`${API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -379,6 +379,7 @@ export default function GeneratorPage() {
       console.error("Failed to save edited prompt to history:", historyError);
     }
   };
+
 
   return (
     <div style={{
@@ -1166,7 +1167,7 @@ export default function GeneratorPage() {
                       ) : (
                         <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
+                            {finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || ""}
                           </ReactMarkdown>
                         </div>
                       )}

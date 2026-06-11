@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 import logging
@@ -39,7 +40,10 @@ from database import (
     get_user_by_email
 )
 
-app = FastAPI(root_path="/prompt_generator")
+app = FastAPI(root_path="/prompt_generator/api")
+
+# Add ProxyHeadersMiddleware to trust X-Forwarded-Proto headers from proxy
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # =========================
 # Auth Configuration
@@ -87,6 +91,7 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "https://brollysolutions.in",
 ]
 
 app.add_middleware(

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, Edit, Maximize2, X, Trash2, User, Settings, LogOut, Key, Save, Edit2, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { API_URL } from "@/lib/api_config";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -95,7 +96,7 @@ export default function HistoryPage() {
     if (!sid) return;
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history?session_id=${sid}`);
+      const response = await fetch(`${API_URL}/history?session_id=${sid}`);
       const data = await response.json();
       setPromptHistory(data.history || []);
     } catch (error) {
@@ -127,7 +128,7 @@ export default function HistoryPage() {
   const handleSaveEdit = async (versionId: number) => {
     try {
       setIsSavingEdit(true);
-      const response = await fetch(`http://127.0.0.1:8000/history`, {
+      const response = await fetch(`${API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -153,7 +154,7 @@ export default function HistoryPage() {
   const handleDelete = async (versionId: number) => {
     if (!window.confirm("Are you sure you want to delete this version?")) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history/${versionId}`, {
+      const response = await fetch(`${API_URL}/history/${versionId}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -178,7 +179,7 @@ export default function HistoryPage() {
       }
 
       // Create a new version for the restore action
-      const response = await fetch(`http://127.0.0.1:8000/history`, {
+      const response = await fetch(`${API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -926,3 +927,4 @@ export default function HistoryPage() {
     </div>
   );
 }
+
