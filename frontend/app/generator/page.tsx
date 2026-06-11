@@ -186,7 +186,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/test-prompt`, {
+      const response = await fetch(`${API_URL}/test-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
@@ -211,7 +211,7 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-questions`, {
+      const response = await fetch(`${API_URL}/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: userInput }),
@@ -259,7 +259,7 @@ export default function GeneratorPage() {
         }
       });
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-final-prompt`, {
+      const response = await fetch(`${API_URL}/generate-final-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -276,7 +276,7 @@ export default function GeneratorPage() {
 
       // Save to history
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
+        await fetch(`${API_URL}/history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -291,7 +291,7 @@ export default function GeneratorPage() {
 
       // Auto-score the generated prompt
       try {
-        const scoreResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/score-prompt`, {
+        const scoreResponse = await fetch(`${API_URL}/score-prompt`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText }),
@@ -344,8 +344,7 @@ export default function GeneratorPage() {
       finalPrompt?.final_instruction ||
       finalPrompt?.final_prompt ||
       "";
-    const markdownText = "```markdown\n" + text + "\n```";
-    navigator.clipboard.writeText(markdownText).then(() => {
+    navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
@@ -367,7 +366,7 @@ export default function GeneratorPage() {
     
     // Save to history
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
+      await fetch(`${API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -380,6 +379,7 @@ export default function GeneratorPage() {
       console.error("Failed to save edited prompt to history:", historyError);
     }
   };
+
 
   return (
     <div style={{
@@ -1167,7 +1167,7 @@ export default function GeneratorPage() {
                       ) : (
                         <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
+                            {finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || ""}
                           </ReactMarkdown>
                         </div>
                       )}

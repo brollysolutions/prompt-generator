@@ -36,11 +36,10 @@ export default function LoginPage() {
     setError("");
     
     // Debug log to check the API URL in the production console
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://brollysolutions.in/prompt_generator/api";
-    console.log("Using API URL:", apiUrl);
+    console.log("Using API URL:", API_URL);
 
     try {
-      const response = await fetch(`${apiUrl}/auth/google`, {
+      const response = await fetch(`${API_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential }),
@@ -67,7 +66,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
+      const response = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -87,6 +86,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div style={{
