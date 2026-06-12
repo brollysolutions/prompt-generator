@@ -4,6 +4,14 @@ import os
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "prompt_scores.db"))
 
+# Ensure the directory containing the database exists
+DB_DIR = os.path.dirname(DB_PATH)
+if DB_DIR:
+    try:
+        os.makedirs(DB_DIR, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create database directory {DB_DIR}: {e}")
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
