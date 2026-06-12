@@ -2,7 +2,8 @@ from fastapi import FastAPI, Request, Depends, HTTPException, status
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+import httpx
 from fastapi.security import OAuth2PasswordBearer
 import logging
 import os
@@ -316,6 +317,98 @@ class GoogleAuthRequest(BaseModel):
     credential: str
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/prompt_generator/api/auth/google")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+@app.get("/auth/google")
+async def google_auth_get(action: str = None, code: str = None, state: str = "redirect"):
+    """
+    Overloaded endpoint for Google Auth:
+    - ?action=config: Returns Google Client ID.
+    - ?action=login: Redirects to Google Consent screen.
+    - ?code=...: Handles the callback from Google.
+    """
+    # 1. Config Action
+    if action == "config":
+        return {"client_id": GOOGLE_CLIENT_ID}
+
+    # 2. Login Action (Redirect to Google)
+    if action == "login":
+        if not GOOGLE_CLIENT_ID:
+            raise HTTPException(status_code=500, detail="Google Client ID not configured")
+        
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth"
+            f"?client_id={GOOGLE_CLIENT_ID}"
+            f"&redirect_uri={GOOGLE_REDIRECT_URI}"
+            f"&response_type=code"
+            f"&scope=openid%20email%20profile"
+            f"&state={state}"
+        )
+        return RedirectResponse(url=auth_url)
+
+    # 3. Callback (Handle code from Google)
+    if code:
+        if not GOOGLE_CLIENT_SECRET:
+            logger.error("GOOGLE_CLIENT_SECRET is not set")
+            raise HTTPException(status_code=500, detail="Server configuration error")
+
+        # Exchange code for token
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(token_url, data=data)
+            if response.status_code != 200:
+                logger.error(f"Failed to exchange code for token: {response.text}")
+                raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+            
+            token_data = response.json()
+            id_token_str = token_data.get("id_token")
+
+        try:
+            # Verify the Google token
+            idinfo = id_token.verify_oauth2_token(id_token_str, requests.Request(), GOOGLE_CLIENT_ID)
+            email = idinfo['email']
+
+            # Check if user exists
+            user = get_user_by_email(email)
+            if not user:
+                # Create a new user
+                user_id = create_user(email, "!GOOGLE_AUTH_USER")
+                if user_id == -1:
+                    raise HTTPException(status_code=500, detail="Failed to create user")
+                user = {"id": user_id, "email": email}
+
+            # Issue our JWT
+            access_token = create_access_token(data={"sub": email})
+
+            # Handle response based on state
+            if state == "json":
+                return {
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "user_id": user["id"],
+                    "email": email
+                }
+            else:
+                # Default to redirecting back to frontend
+                return RedirectResponse(url=f"{FRONTEND_URL}/login?token={access_token}")
+
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Invalid Google token")
+        except Exception as e:
+            logger.error(f"Google auth callback error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    raise HTTPException(status_code=400, detail="Invalid request")
 
 @app.post("/auth/google")
 async def google_auth(data: GoogleAuthRequest):
