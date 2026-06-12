@@ -1358,7 +1358,7 @@ export default function GeneratorPage() {
                         <option value="" disabled hidden>
                           {!settingsApiProvider ? "Select a provider first" : "Enter the Model"}
                         </option>
-                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider].map(m => (
+                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider]?.map(m => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                       </select>

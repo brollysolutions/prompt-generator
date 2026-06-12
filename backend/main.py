@@ -155,6 +155,13 @@ def home():
         "message": "Smart Prompt Generator API Running"
     }
 
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "message": "Smart Prompt Generator API is healthy"
+    }
+
 
 # =========================
 # GENERATE QUESTIONS API
