@@ -361,12 +361,23 @@ async def enhance_prompt_text(original_prompt: str, instruction: str) -> str:
 # TEST PROMPT FEATURE
 # =========================
 
+TEST_PROMPT_SYSTEM_INSTRUCTION = """
+Act as an expert AI prompt engineer. Your task is to take the provided generated final prompt as input and give a response that is highly relevant, clear, and context-aware.
+
+The Response should cover the key aspects, objectives, challenges, use cases, and important details related to the idea while avoiding ambiguity, repetition, and irrelevant content. Based on this generated prompt, consistently produce an accurate, comprehensive, and contextually relevant Response for any given idea, ensuring high-quality output suitable for downstream AI processing.
+
+Furthermore, engage in deep thinking and reasoning. Simulate the advanced reasoning capabilities and response styles of top-tier AI models such as ChatGPT, Claude, and Gemini. Carefully analyze the input, consider multiple perspectives, and provide a highly structured, comprehensive, and nuanced output.
+"""
+
 async def test_generated_prompt(prompt: str) -> str:
     """Sends the generated prompt to the LLM and returns its response."""
     try:
         response = await client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": TEST_PROMPT_SYSTEM_INSTRUCTION},
+                {"role": "user", "content": f"Execute the following prompt:\n\n{prompt}"}
+            ],
             temperature=0.6,
             max_tokens=2500
         )
