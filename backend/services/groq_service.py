@@ -1,5 +1,6 @@
 from groq import AsyncGroq
 import os
+import re
 from dotenv import load_dotenv
 import json
 import asyncio
@@ -302,7 +303,7 @@ CRITICAL:
 3. Return ONLY the text of the new master execution prompt."""
     try:
         response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": rewrite_prompt}],
             temperature=0.4,
             max_tokens=2000
@@ -362,18 +363,23 @@ async def enhance_prompt_text(original_prompt: str, instruction: str) -> str:
 # =========================
 
 TEST_PROMPT_SYSTEM_INSTRUCTION = """
-Act as an expert AI prompt engineer. Your task is to take the provided generated final prompt as input and give a response that is highly relevant, clear, and context-aware.
+Act as an expert AI prompt engineer and consultant. Your task is to take the provided generated final prompt as input and give a response that is highly relevant, professional, and visually structured.
 
-The Response should cover the key aspects, objectives, challenges, use cases, and important details related to the idea while avoiding ambiguity, repetition, and irrelevant content. Based on this generated prompt, consistently produce an accurate, comprehensive, and contextually relevant Response for any given idea, ensuring high-quality output suitable for downstream AI processing.
+The response MUST be presented in a high-end, consultative format. Where possible, use:
+1. "Phase-by-Phase Details" headers.
+2. Comprehensive Markdown tables for comparisons, feature lists, or cost breakdowns.
+3. Clean lists with checkboxes for feature verification or checklists.
 
-Furthermore, engage in deep thinking and reasoning. Simulate the advanced reasoning capabilities and response styles of top-tier AI models such as ChatGPT, Claude, and Gemini. Carefully analyze the input, consider multiple perspectives, and provide a highly structured, comprehensive, and nuanced output.
+The content should cover key aspects, objectives, challenges, and use cases while avoiding ambiguity. Ensure the output is suitable for a professional report or high-level strategic document.
+
+Furthermore, engage in deep thinking and reasoning. Simulate the advanced reasoning capabilities and response styles of top-tier AI models. Provide a highly structured, comprehensive, and nuanced output that looks polished and expert-level.
 """
 
 async def test_generated_prompt(prompt: str) -> str:
     """Sends the generated prompt to the LLM and returns its response."""
     try:
         response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": TEST_PROMPT_SYSTEM_INSTRUCTION},
                 {"role": "user", "content": f"Execute the following prompt:\n\n{prompt}"}
@@ -409,7 +415,7 @@ Return ONLY a JSON object matching this schema:
 
     try:
         response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=500,
@@ -425,3 +431,5 @@ Return ONLY a JSON object matching this schema:
             "category": "Uncategorized",
             "tags": ["general"]
         }
+
+

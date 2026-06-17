@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShieldCheck, Copy, Play, Sparkles, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown } from "lucide-react";
+import { ShieldCheck, Copy, Play, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown } from "lucide-react";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -67,8 +67,6 @@ export default function GeneratorPage() {
   const [loadingTest, setLoadingTest] = useState(false);
 
   const [showDetails, setShowDetails] = useState(false);
-  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
-  const [editPromptBuffer, setEditPromptBuffer] = useState("");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsApiKey, setSettingsApiKey] = useState("");
@@ -267,6 +265,7 @@ export default function GeneratorPage() {
           questions,
           target_ai: targetAi,
           internal_prompt: internalPrompt,
+          user_id: user?.id || 0,
         }),
       });
       const data = await response.json();
@@ -282,6 +281,7 @@ export default function GeneratorPage() {
             session_id: sessionId,
             prompt_text: promptText,
             source: "generated",
+            user_id: user?.id || 0,
           }),
         });
       } catch (historyError) {
@@ -348,36 +348,6 @@ export default function GeneratorPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
-  };
-
-  const handleSavePromptEdit = async () => {
-    if (!finalPrompt || !editPromptBuffer.trim()) return;
-    
-    const updatedPrompt = {
-      ...finalPrompt,
-      smart_prompt: editPromptBuffer,
-      final_instruction: undefined,
-      final_prompt: undefined
-    };
-    
-    setFinalPrompt(updatedPrompt);
-    localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
-    setIsEditingPrompt(false);
-    
-    // Save to history
-    try {
-      await fetch("http://127.0.0.1:8000/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          prompt_text: editPromptBuffer,
-          source: "edited (live)",
-        }),
-      });
-    } catch (historyError) {
-      console.error("Failed to save edited prompt to history:", historyError);
-    }
   };
 
   return (
@@ -984,80 +954,24 @@ export default function GeneratorPage() {
                         <span style={{ color: "#000000", fontWeight: 700 }}>Your Smart Prompt</span>
                       </div>
                       <div style={{ display: "flex", gap: "10px" }}>
-                        {!isEditingPrompt ? (
-                          <>
-                            <button
-                              onClick={() => {
-                                const text = finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "";
-                                setEditPromptBuffer(text);
-                                setIsEditingPrompt(true);
-                              }}
-                              style={{
-                                padding: "8px 18px",
-                                background: "rgba(255, 255, 255, 0.8)",
-                                border: "1px solid #D4AF37",
-                                borderRadius: "10px",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                                color: "#AA8A27",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px"
-                              }}
-                            >
-                              <Sparkles size={16} /> Edit
-                            </button>
-                            <button
-                              onClick={handleCopy}
-                              style={{
-                                padding: "8px 18px",
-                                background: copied ? "#10b981" : "#000000",
-                                color: "#ffffff",
-                                border: "none",
-                                borderRadius: "10px",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px"
-                              }}
-                            >
-                              {copied ? <ShieldCheck size={16} /> : <Copy size={16} />}
-                              {copied ? "Copied!" : "Copy"}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={handleSavePromptEdit}
-                              style={{
-                                padding: "8px 18px",
-                                background: "#000000",
-                                color: "#ffffff",
-                                border: "none",
-                                borderRadius: "10px",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
-                            >
-                              Save Changes
-                            </button>
-                            <button
-                              onClick={() => setIsEditingPrompt(false)}
-                              style={{
-                                padding: "8px 18px",
-                                background: "#f3f4f6",
-                                color: "#4b5563",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "10px",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={handleCopy}
+                          style={{
+                            padding: "8px 18px",
+                            background: copied ? "#10b981" : "#000000",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          {copied ? <ShieldCheck size={16} /> : <Copy size={16} />}
+                          {copied ? "Copied!" : "Copy"}
+                        </button>
                       </div>
                     </div>
 
@@ -1144,32 +1058,11 @@ export default function GeneratorPage() {
                     )}
 
                     <div style={{ padding: "28px 32px" }}>
-                      {isEditingPrompt ? (
-                        <textarea
-                          value={editPromptBuffer}
-                          onChange={(e) => setEditPromptBuffer(e.target.value)}
-                          style={{
-                            width: "100%",
-                            height: "400px",
-                            padding: "20px",
-                            borderRadius: "16px",
-                            border: "2px solid #D4AF37",
-                            background: "rgba(255, 255, 255, 0.9)",
-                            color: "#000000",
-                            fontSize: "15px",
-                            lineHeight: "1.7",
-                            fontFamily: "inherit",
-                            outline: "none",
-                            resize: "vertical",
-                          }}
-                        />
-                      ) : (
-                        <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
-                          </ReactMarkdown>
-                        </div>
-                      )}
+                      <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
 
@@ -1177,7 +1070,7 @@ export default function GeneratorPage() {
                     marginTop: "30px",
                     background: "rgba(255, 255, 255, 0.7)",
                     backdropFilter: "blur(12px)",
-                    border: "1px solid rgba(212, 175, 55, 0.5)",
+                    border: "2px solid rgba(212, 175, 55, 0.6)",
                     borderRadius: "24px",
                     padding: "32px",
                     boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
@@ -1199,20 +1092,25 @@ export default function GeneratorPage() {
                         id="test-response-container" 
                         style={{ 
                           marginTop: "24px", 
-                          padding: "20px",
-                          background: "rgba(249, 250, 251, 0.6)",
+                          padding: "24px",
+                          background: "rgba(243, 244, 246, 0.5)",
                           borderRadius: "16px",
-                          border: "1px dashed #D4AF37",
-                          color: "#374151",
-                          lineHeight: 1.6,
-                          fontSize: "15px"
+                          border: "1px solid rgba(212, 175, 55, 0.3)",
+                          color: "#111827",
+                          lineHeight: 1.8,
+                          fontSize: "16px",
+                          fontFamily: "'Georgia', 'Times New Roman', serif",
+                          position: "relative",
+                          overflow: "visible"
                         }}
                       >
-                        <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "10px", fontSize: "13px", textTransform: "uppercase" }}>AI Response</div>
-                        <div className="markdown-content">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {testResponse}
-                          </ReactMarkdown>
+                        <div style={{ position: "relative", zIndex: 1 }}>
+                          <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "20px", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>AI Strategic Response</div>
+                          <div className="markdown-content">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {testResponse}
+                            </ReactMarkdown>
+                          </div>
                         </div>
                       </motion.div>
                     )}
@@ -1355,7 +1253,7 @@ export default function GeneratorPage() {
                         <option value="" disabled hidden>
                           {!settingsApiProvider ? "Select a provider first" : "Enter the Model"}
                         </option>
-                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider].map(m => (
+                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider] && PROVIDER_MODELS[settingsApiProvider].map(m => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                       </select>
@@ -1597,6 +1495,36 @@ export default function GeneratorPage() {
           font-style: italic;
           color: #6b7280;
           margin-bottom: 16px;
+        }
+        .markdown-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 24px 0;
+          font-family: 'Georgia', serif;
+        }
+        .markdown-content th {
+          font-weight: 700;
+          color: #000;
+          text-align: left;
+          padding: 12px 8px;
+          border-bottom: 2px solid #D4AF37;
+        }
+        .markdown-content td {
+          padding: 16px 8px;
+          vertical-align: top;
+          border-bottom: 1px solid #F3F4F6;
+        }
+        .markdown-content tr td:first-child {
+          font-weight: 700;
+          color: #000;
+        }
+        .markdown-content input[type="checkbox"] {
+          accent-color: #10b981;
+          width: 18px;
+          height: 18px;
+          margin-right: 8px;
+          vertical-align: middle;
+          cursor: default;
         }
       `}</style>
   </div>

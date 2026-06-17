@@ -77,23 +77,22 @@ export default function LibraryPage() {
       router.push("/login");
     }
   }, [user, authLoading, router]);
+const fetchLibrary = async () => {
+  if (!user) return;
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/library?user_id=${user.id}`);
+    const data = await response.json();
+    setPrompts(data.prompts || []);
+  } catch (error) {
+    console.error("Failed to fetch library", error);
+  }
+};
 
-  const fetchLibrary = async () => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/library");
-      const data = await response.json();
-      setPrompts(data.prompts || []);
-    } catch (error) {
-      console.error("Failed to fetch library", error);
-    }
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      await fetchLibrary();
-    };
-    init();
-  }, []);
+useEffect(() => {
+  if (!authLoading && user) {
+    fetchLibrary();
+  }
+}, [user, authLoading]);
 
   const handleCopy = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
@@ -607,7 +606,7 @@ export default function LibraryPage() {
                         <option value="" disabled hidden>
                           {!settingsApiProvider ? "Select a provider first" : "Enter the Model"}
                         </option>
-                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider].map(m => (
+                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider] && PROVIDER_MODELS[settingsApiProvider].map(m => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                       </select>

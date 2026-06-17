@@ -46,6 +46,8 @@ export default function HistoryPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [versionToDelete, setVersionToDelete] = useState<number | null>(null);
+  const [versionToRestore, setVersionToRestore] = useState<HistoryItem | null>(null);
   const [settingsApiKey, setSettingsApiKey] = useState("");
   const [settingsApiProvider, setSettingsApiProvider] = useState("");
   const [settingsApiModel, setSettingsApiModel] = useState("");
@@ -133,7 +135,8 @@ export default function HistoryPage() {
         body: JSON.stringify({ 
           session_id: sessionId,
           prompt_text: editBuffer,
-          source: "edited (history)"
+          source: "edited (history)",
+          user_id: user?.id || 0,
         }),
       });
       if (response.ok) {
@@ -150,10 +153,14 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDelete = async (versionId: number) => {
-    if (!window.confirm("Are you sure you want to delete this version?")) return;
+  const handleDelete = (versionId: number) => {
+    setVersionToDelete(versionId);
+  };
+
+  const confirmDelete = async () => {
+    if (versionToDelete === null) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history/${versionId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/history/${versionToDelete}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -164,14 +171,21 @@ export default function HistoryPage() {
     } catch (error) {
       console.error(error);
       alert("Error deleting version.");
+    } finally {
+      setVersionToDelete(null);
     }
   };
 
-  const handleRestore = async (version: HistoryItem) => {
+  const handleRestore = (version: HistoryItem) => {
+    setVersionToRestore(version);
+  };
+
+  const confirmRestore = async () => {
+    if (!versionToRestore) return;
     try {
-      let promptToRestore = version.prompt_text;
+      let promptToRestore = versionToRestore.prompt_text;
       
-      const index = promptHistory.findIndex(v => v.id === version.id);
+      const index = promptHistory.findIndex(v => v.id === versionToRestore.id);
       const prevVersion = promptHistory[index + 1];
       if (prevVersion) {
         promptToRestore = prevVersion.prompt_text;
@@ -184,7 +198,8 @@ export default function HistoryPage() {
         body: JSON.stringify({ 
           session_id: sessionId,
           prompt_text: promptToRestore,
-          source: "restored"
+          source: "restored",
+          user_id: user?.id || 0,
         }),
       });
 
@@ -198,10 +213,12 @@ export default function HistoryPage() {
       localStorage.setItem("finalPrompt", JSON.stringify(updatedPrompt));
       setCurrentPrompt(updatedPrompt);
       await fetchHistory();
+      setVersionToRestore(null);
       alert("Prompt version restored! Go to the Generator page to see it.");
     } catch (error) {
       console.error(error);
       alert("Failed to restore version.");
+      setVersionToRestore(null);
     }
   };
 
@@ -472,7 +489,7 @@ export default function HistoryPage() {
                           >
                             <Maximize2 size={14} /> Compare
                           </button>
-                          {!version.source.includes('generated') && (
+                          {!version.source.includes('generated') && !version.source.includes('restored') && (
                             <button
                               onClick={() => handleRestore(version)}
                               style={{
@@ -858,6 +875,184 @@ export default function HistoryPage() {
               >
                 Close
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Delete Confirmation Modal */}
+      <AnimatePresence>
+        {versionToDelete !== null && (
+          <div style={{
+            position: "fixed",
+            top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0, 0, 0, 0.4)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{
+                background: "#ffffff",
+                border: "1px solid rgba(212, 175, 55, 0.3)",
+                borderRadius: "24px",
+                padding: "32px",
+                width: "100%",
+                maxWidth: "400px",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                textAlign: "center"
+              }}
+            >
+              <div style={{
+                width: "48px", height: "48px",
+                background: "rgba(239, 68, 68, 0.1)",
+                borderRadius: "12px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px",
+                color: "#ef4444"
+              }}>
+                <Trash2 size={24} />
+              </div>
+              <h2 style={{ color: "#000000", fontSize: "20px", fontWeight: 800, margin: "0 0 8px 0" }}>Delete Version?</h2>
+              <p style={{ color: "#6B7280", fontSize: "14px", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+                Are you sure you want to delete this prompt version? This action cannot be undone.
+              </p>
+              
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  onClick={() => setVersionToDelete(null)}
+                  style={{
+                    flex: 1,
+                    background: "#f3f4f6",
+                    color: "#4b5563",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    padding: "10px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "#E5E7EB"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  style={{
+                    flex: 1,
+                    background: "#ef4444",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "12px",
+                    padding: "10px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "opacity 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Restore Confirmation Modal */}
+      <AnimatePresence>
+        {versionToRestore !== null && (
+          <div style={{
+            position: "fixed",
+            top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0, 0, 0, 0.4)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{
+                background: "#ffffff",
+                border: "1px solid rgba(212, 175, 55, 0.3)",
+                borderRadius: "24px",
+                padding: "32px",
+                width: "100%",
+                maxWidth: "400px",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                textAlign: "center"
+              }}
+            >
+              <div style={{
+                width: "48px", height: "48px",
+                background: "rgba(212, 175, 55, 0.1)",
+                borderRadius: "12px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px",
+                color: "#AA8A27"
+              }}>
+                <RotateCcw size={24} />
+              </div>
+              <h2 style={{ color: "#000000", fontSize: "20px", fontWeight: 800, margin: "0 0 8px 0" }}>Restore Version?</h2>
+              <p style={{ color: "#6B7280", fontSize: "14px", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+                Are you sure you want to restore this prompt version? It will become your active prompt.
+              </p>
+              
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  onClick={() => setVersionToRestore(null)}
+                  style={{
+                    flex: 1,
+                    background: "#f3f4f6",
+                    color: "#4b5563",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    padding: "10px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "#E5E7EB"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRestore}
+                  style={{
+                    flex: 1,
+                    background: "#000000",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "12px",
+                    padding: "10px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "opacity 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                >
+                  Restore
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

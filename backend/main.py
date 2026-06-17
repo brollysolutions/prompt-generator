@@ -128,9 +128,11 @@ class VersionRequest(BaseModel):
     session_id: str
     prompt_text: str
     source: str
+    user_id: int = 0
 
 class UpdateVersionRequest(BaseModel):
     prompt_text: str
+    user_id: int = 0
 
 class FinalPromptRequest(BaseModel):
     user_input: str
@@ -138,6 +140,7 @@ class FinalPromptRequest(BaseModel):
     questions: list = []
     target_ai: str = ""
     caveman_mode: bool = False
+    user_id: int = 0
 
 # =========================
 # HOME ROUTE
@@ -191,7 +194,8 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
                 name=cat_data.get("name", "New Prompt"),
                 prompt_text=prompt_text,
                 tags=cat_data.get("tags", []),
-                category=cat_data.get("category", "General")
+                category=cat_data.get("category", "General"),
+                user_id=data.user_id
             )
     except Exception as e:
         logger.error(f"Failed to auto-categorize/save to library: {e}")
@@ -243,7 +247,8 @@ async def save_history_api(data: VersionRequest):
                 name=cat_data.get("name", "Edited Prompt"),
                 prompt_text=data.prompt_text,
                 tags=cat_data.get("tags", []),
-                category=cat_data.get("category", "General")
+                category=cat_data.get("category", "General"),
+                user_id=data.user_id
             )
         except Exception as e:
             logger.error(f"Failed to save edited history to library: {e}")
@@ -263,7 +268,8 @@ async def update_history_api(version_id: int, data: UpdateVersionRequest):
             name=cat_data.get("name", "Edited Prompt"),
             prompt_text=data.prompt_text,
             tags=cat_data.get("tags", []),
-            category=cat_data.get("category", "General")
+            category=cat_data.get("category", "General"),
+            user_id=data.user_id
         )
     except Exception as e:
         logger.error(f"Failed to save edited version to library: {e}")
@@ -287,8 +293,8 @@ async def get_history_api(session_id: str = None):
 # =========================
 
 @app.get("/library")
-async def get_library_api():
-    prompts = get_library_prompts()
+async def get_library_api(user_id: int = 0):
+    prompts = get_library_prompts(user_id)
     return {"prompts": prompts}
 
 @app.delete("/library/{prompt_id}")

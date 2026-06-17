@@ -45,6 +45,13 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Migration: Add user_id to library_prompts if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE library_prompts ADD COLUMN user_id INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+        
     conn.commit()
     conn.close()
 
@@ -182,27 +189,28 @@ def get_prompt_history(session_id: str = None):
     conn.close()
     return history
 
-def save_library_prompt(name: str, prompt_text: str, tags: list, category: str) -> int:
+def save_library_prompt(name: str, prompt_text: str, tags: list, category: str, user_id: int = 0) -> int:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO library_prompts (name, prompt_text, tags, category)
-        VALUES (?, ?, ?, ?)
-    ''', (name, prompt_text, json.dumps(tags), category))
+        INSERT INTO library_prompts (name, prompt_text, tags, category, user_id)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (name, prompt_text, json.dumps(tags), category, user_id))
     prompt_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return prompt_id
 
-def get_library_prompts():
+def get_library_prompts(user_id: int = 0):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, name, prompt_text, tags, category, created_at
+        SELECT id, name, prompt_text, tags, category, created_at, user_id
         FROM library_prompts
+        WHERE user_id = ?
         ORDER BY created_at DESC
-    ''')
+    ''', (user_id,))
     rows = cursor.fetchall()
     prompts = []
     for row in rows:
