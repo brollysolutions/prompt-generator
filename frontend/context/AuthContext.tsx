@@ -47,6 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
+    localStorage.removeItem("user_api_key");
+    localStorage.removeItem("user_api_provider");
+    localStorage.removeItem("user_api_model");
     router.push("/");
   };
 

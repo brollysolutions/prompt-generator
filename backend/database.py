@@ -138,20 +138,21 @@ def delete_version_and_library_entry(version_id: int) -> bool:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # 1. Get the prompt text first
-    cursor.execute('SELECT prompt_text FROM prompt_versions WHERE id = ?', (version_id,))
+    # 1. Get the prompt text and source first
+    cursor.execute('SELECT prompt_text, source FROM prompt_versions WHERE id = ?', (version_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         return False
     
-    prompt_text = row[0]
+    prompt_text, source = row[0], row[1]
     
     # 2. Delete from history
     cursor.execute('DELETE FROM prompt_versions WHERE id = ?', (version_id,))
     
-    # 3. Delete from library where text matches
-    cursor.execute('DELETE FROM library_prompts WHERE prompt_text = ?', (prompt_text,))
+    # 3. Delete from library where text matches, but only if it's not a restored version
+    if source != 'restored':
+        cursor.execute('DELETE FROM library_prompts WHERE prompt_text = ?', (prompt_text,))
     
     conn.commit()
     conn.close()

@@ -404,13 +404,17 @@ export default function GeneratorPage() {
                 </Link>
                 <button
                   onClick={() => {
-                    const token = localStorage.getItem("auth_token");
-                    const user = localStorage.getItem("auth_user");
-                    const sessionId = localStorage.getItem("sessionId");
-                    localStorage.clear();
-                    if (token) localStorage.setItem("auth_token", token);
-                    if (user) localStorage.setItem("auth_user", user);
-                    if (sessionId) localStorage.setItem("sessionId", sessionId);
+                    const keysToRemove = [
+                      "userInput",
+                      "questions",
+                      "answers",
+                      "customAnswers",
+                      "finalPrompt",
+                      "targetAi",
+                      "testResponse",
+                      "internalPrompt"
+                    ];
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
                     window.location.reload();
                   }}
                   style={{

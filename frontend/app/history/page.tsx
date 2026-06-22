@@ -214,10 +214,8 @@ export default function HistoryPage() {
       setCurrentPrompt(updatedPrompt);
       await fetchHistory();
       setVersionToRestore(null);
-      alert("Prompt version restored! Go to the Generator page to see it.");
     } catch (error) {
       console.error(error);
-      alert("Failed to restore version.");
       setVersionToRestore(null);
     }
   };
