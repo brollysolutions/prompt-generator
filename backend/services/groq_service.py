@@ -53,31 +53,39 @@ def clean_json_content(content: str) -> str:
 
 async def generate_questions(user_input):
 
-    prompt = f"""You are an expert AI Requirements Analyst.
+    prompt = f"""You are an expert AI Requirements Analyst and Domain Expert.
 
-A user wants to create an AI prompt for this specific topic/idea:
+The user wants to create an AI prompt for the following idea:
 "{user_input}"
 
-Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the exact details needed to build a world-class prompt for THIS SPECIFIC TOPIC.
+Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to REFINE and FINALIZE this prompt into a world-class, production-ready execution tool. 
+
+Think deeply about what variables make the biggest difference in quality for this specific request. 
 
 CRITICAL RULES:
-1. DO NOT ask generic questions (e.g., "What is the primary goal?", "Who is the target audience?", "What is your experience level?") UNLESS it perfectly aligns with the topic.
-2. Tailor every question to the domain. (e.g., If it's a diet plan, ask about allergies, calorie goals, cuisine preferences. If it's code, ask about tech stack, edge cases, deployment).
-3. Only use these input types: "text", "textarea", "dropdown", "radio", "checkbox".
-4. For "dropdown", "radio", and "checkbox" types, you MUST include a logical "options" array with 3-6 highly relevant choices.
-5. NOTE: A "Custom Message" option is automatically added to all "dropdown", "radio", and "checkbox" types by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
+1. DO NOT ask generic questions (e.g., "What is the primary goal?", "Who is the target audience?") UNLESS they are uniquely tailored to the specific domain.
+2. Ensure the questions directly capture the core variables needed to execute the task perfectly.
+3. For educational or mentorship tasks, you MUST include questions about:
+   - Time availability per week.
+   - Specific end-goal (e.g., job-seeking, side project, hobby).
+   - Preferred learning style (e.g., hands-on/coding-first, theoretical/reading, video-based).
+4. Use clear, user-friendly language. Make the questions easy to answer.
+5. ALL questions MUST use the "checkbox" type. This allows the user to select multiple relevant options.
+6. For every question, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. Do not make the user think too hard—give them the best default options.
+7. NOTE: A "Custom Message" option is automatically added to all checkbox questions by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
 
 Return ONLY a JSON object matching this exact schema:
 {{
   "questions": [
     {{
       "question": "A highly specific question related to the user's idea",
-      "type": "radio",
+      "type": "checkbox",
       "options": ["Specific Option 1", "Specific Option 2", "Specific Option 3"]
     }},
     {{
       "question": "Another specific detail needed",
-      "type": "textarea"
+      "type": "checkbox",
+      "options": ["Option A", "Option B", "Option C"]
     }}
   ]
 }}"""
@@ -98,9 +106,21 @@ Return ONLY a JSON object matching this exact schema:
         print(f"EXCEPTION generating questions: {str(e)}")
         # Return fallback questions so the UI doesn't break
         return [
-            {"question": "What is the primary goal you want to achieve with this prompt?", "type": "textarea"},
-            {"question": "Who is the target audience for the AI's response?", "type": "text"},
-            {"question": "Are there any specific constraints or things the AI should avoid?", "type": "textarea"}
+            {
+                "question": "What are the primary goals you want to achieve with this prompt?", 
+                "type": "checkbox",
+                "options": ["Automation", "Creative Content", "Data Analysis", "Educational Guidance", "Technical Problem Solving"]
+            },
+            {
+                "question": "Who is the target audience for the AI's response?", 
+                "type": "checkbox",
+                "options": ["Technical Experts", "General Public", "Small Business Owners", "Students/Learners", "Decision Makers"]
+            },
+            {
+                "question": "Which specific constraints should the AI adhere to?", 
+                "type": "checkbox",
+                "options": ["Strictly Professional Tone", "Concise Outputs", "Detailed Step-by-Step Guides", "No Technical Jargon", "Avoid Controversial Topics"]
+            }
         ]
 
 # =========================
@@ -122,179 +142,96 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
 
         qa_context = "\n\n".join(qa_lines) if qa_lines else "(No answers provided)"
 
-        # Step 1: Draft the initial version
-        draft_prompt = await _build_smart_prompt_text(user_input, qa_context, target_ai, caveman_mode)
+        # NEW UNIFIED STRATEGY: One high-powered call for everything
+        # Using llama-3.3-70b-versatile for "best of best" quality
         
-        # Step 2: Parallel execution of Metadata and Self-Correction
-        # This eliminates sequential waiting for metadata
-        final_prompt_task = _self_correct_prompt(draft_prompt, user_input, qa_context)
-        metadata_task = _build_metadata(user_input, qa_context, draft_prompt)
+        optimization_instruction = ""
+        if target_ai:
+            optimization_instruction = f"Optimize specifically for {target_ai}. Use its preferred structural conventions (e.g., XML for Claude, Markdown for GPT)."
+
+        caveman_instruction = "OFF"
+        if caveman_mode:
+            caveman_instruction = "ON (Token Compression active: strip linguistic filler, use primitive but high-reasoning language)."
+
+        prompt = f"""You are the World's Greatest Expert AI Prompt Engineer. Your mission is to take a raw user idea and their specific responses to clarifying questions to craft a master execution prompt that is highly relevant, clear, and context-aware.
+
+USER INTENT: {user_input}
+USER CONTEXT: {qa_context}
+TARGET AI: {target_ai if target_ai else 'Universal'}
+
+---
+## PRE-EXECUTION ANALYSIS
+Before writing the prompt, perform a deep-dive analysis of the input idea and responses:
+1. **Strategic Audit:** Identify key aspects, objectives, and specific use cases.
+2. **Challenge Detection:** Pinpoint potential challenges, constraints, and "invisible variables" that could lead to ambiguity.
+3. **Model Optimization:** {optimization_instruction}
+4. **Language:** {caveman_instruction}
+
+---
+## TASK
+Based on your analysis, generate a FINAL OPTIMIZED PROMPT that can consistently produce accurate, comprehensive, and contextually high-quality output suitable for downstream AI processing. 
+
+The prompt MUST cover these six sections, avoiding all ambiguity, repetition, and irrelevant content:
+
+### # Role & Persona
+(Frame the persona as a specialized, world-class AI system. Include a "Boundary Statement" explicitly stating what the AI will NOT do. For educational tasks, include an adaptive fallback protocol.)
+
+### # Context & Background
+(Full situation including objectives and use cases. Include the detailed User/Learner Profile: time availability, specific goals, and preferred learning style. Include one concrete example of a successful output.)
+
+### # Core Objective
+(One sentence starting with an action verb. Clearly state the primary goal.)
+
+### # Instructions & Step-by-Step Task
+(Numbered list using explicit action verbs. For each step, include estimated duration and a specific milestone outcome.)
+
+### # Rules & Constraints
+(Bulleted list of hard limits. Replace vague tone rules with behavioral rules. Include 2-3 explicit "Do NOT" rules and a "Hallucination Safeguard".)
+
+### # Expected Output Format
+(Explicit structure for the final deliverable. Prioritize depth over brevity and specify exact schemas if necessary.)
+
+---
+Return ONLY a JSON object matching this schema:
+{{
+  "title": "Catchy 4-6 word title",
+  "summary": "One sentence summary",
+  "smart_prompt": "THE FULL PERFECTED PROMPT TEXT WITH ALL 6 HEADERS",
+  "quality_score": <int 0-100>,
+  "quality_breakdown": {{
+    "Persona & Role": <0-20>,
+    "Task Clarity & Logic": <0-20>,
+    "Context & Knowledge": <0-20>,
+    "Guardrails & Safety": <0-20>,
+    "Structure & Formatting": <0-20>
+  }},
+  "quality_feedback": ["Feedback 1", "Feedback 2"]
+}}"""
+
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=4000,
+            response_format={"type": "json_object"}
+        )
+
+        result_content = response.choices[0].message.content.strip()
+        final_data = json.loads(result_content)
         
-        final_smart_prompt, meta = await asyncio.gather(final_prompt_task, metadata_task)
+        # Add internal tracking fields
+        final_data["score"] = final_data.get("quality_score", 0)
+        final_data["rewritten_prompt"] = final_data.get("smart_prompt", "")
         
-        # Automatically score the generated prompt
-        score_data = await process_prompt_scoring(final_smart_prompt)
-        meta["score"] = score_data.get("score", 0)
-        meta["quality_score"] = score_data.get("score", 0)
-        meta["quality_breakdown"] = score_data.get("criteria", {})
-        meta["quality_feedback"] = score_data.get("suggestions", [])
-        meta["rewritten_prompt"] = score_data.get("rewritten_prompt", "")
-        
-        meta["smart_prompt"] = final_smart_prompt
-        
-        return meta
+        return final_data
     except Exception as e:
         print(f"EXCEPTION in generate_final_prompt: {str(e)}")
-        # Return a usable fallback structure if everything fails
         return {
             "title": "Generated Prompt (Fallback)",
             "summary": "A basic prompt generated after a system error occurred.",
-            "role": "You are an expert assistant.",
-            "context": f"User Idea: {user_input}",
-            "task": "Complete the task requested by the user.",
-            "constraints": "Follow instructions carefully.",
-            "output_format": "Professional text.",
-            "tone": "Professional",
-            "smart_prompt": f"I was unable to fully optimize your prompt due to an AI service error, but here is your context:\n\nOriginal Idea: {user_input}\n\nAdditional Details:\n{qa_context if 'qa_context' in locals() else 'None'}"
+            "smart_prompt": f"Original Idea: {user_input}\n\nAdditional Details:\n{qa_context}",
+            "quality_score": 50
         }
-
-
-async def _self_correct_prompt(draft_prompt: str, user_input: str, qa_context: str) -> str:
-    """Combines critique and refinement into a single efficient step."""
-    prompt = f"""You are a Master Prompt Architect. Analyze this draft prompt against the original intent and provide a perfected version.
-
-USER ORIGINAL INTENT:
-{user_input}
-
-USER CONTEXT:
-{qa_context}
-
-DRAFT PROMPT:
-{draft_prompt}
-
-TASK:
-1. Identify any missing constraints or clarity issues.
-2. Rewrite the prompt to be more surgical, precise, and effective.
-3. Address specific model requirements if mentioned.
-4. DO NOT add unnecessary bloat; keep it focused on the user's objective.
-5. CRITICAL: Ensure the output is an EXECUTION PROMPT that performs the task directly. DO NOT ask the AI to "write a prompt".
-
-Write the final perfected master execution prompt now:"""
-
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=3000
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"EXCEPTION in _self_correct_prompt: {str(e)}")
-        return draft_prompt
-
-
-async def _build_smart_prompt_text(user_input: str, qa_context: str, target_ai: str = "", caveman_mode: bool = False) -> str:
-    """Initial draft generation."""
-    
-    optimization_instruction = ""
-    if target_ai:
-        if "Claude" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Use XML tags for structure and provide extremely clear, step-by-step instructions as Claude prefers detailed chain-of-thought."
-        elif "ChatGPT" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Focus on clear role definition and Markdown headers. Use a direct, persona-driven approach."
-        elif "Gemini" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. Focus on structured reasoning and comprehensive context. Gemini performs best with multi-faceted instructions."
-        elif "DeepSeek" in target_ai:
-            optimization_instruction = f"IMPORTANT: Optimize specifically for {target_ai}. DeepSeek excels at logic and coding; ensure the prompt is highly analytical and structurally sound."
-        else:
-            optimization_instruction = f"IMPORTANT: Optimize this prompt specifically for use with {target_ai}."
-
-    caveman_instruction = ""
-    if caveman_mode:
-        caveman_instruction = """
-CAVEMAN MODE ACTIVE (Token Compression):
-1. The prompt you generate must instruct the target AI to strip linguistic filler, articles, and pleasantries.
-2. The target AI should use a 'primitive' but high-reasoning style to save 60-80% of tokens.
-3. Ensure the prompt itself is concise but includes all critical context.
-"""
-
-    prompt = f"""You are a world-class AI Prompt Engineer.
-
-USER INITIAL IDEA:
-{user_input}
-
-USER ANSWERS & CONTEXT:
-{qa_context}
-
-CRITICAL RULE:
-You are writing an EXECUTION PROMPT. This prompt will be pasted into another AI (like ChatGPT or Claude) to IMMEDIATELY perform the user's task.
-1. DO NOT write a prompt that asks the AI to "write a prompt".
-2. The output MUST be the final prompt that, when executed, produces the actual results (code, text, analysis, etc.) the user wants.
-3. Use a strong, expert persona in the generated prompt (e.g., "You are an expert Python Developer", "You are a Master Copywriter").
-
-Write a COMPLETE, highly detailed, ready-to-use master execution prompt with these headers:
-# Role & Persona
-# Context & Background
-# Core Objective
-# Instructions & Step-by-Step Task
-# Rules & Constraints
-# Expected Output Format
-
-{optimization_instruction}
-{caveman_instruction}
-
-Write the master execution prompt now:"""
-
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=2500
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"EXCEPTION in _build_smart_prompt_text: {str(e)}")
-        return f"Role: Expert Assistant\nContext: {user_input}\nTask: Generate a solution for {user_input}"
-
-
-async def _build_metadata(user_input: str, qa_context: str, smart_prompt_text: str) -> dict:
-    """Ask the LLM for compact metadata fields as JSON."""
-    prompt = f"""Based on this user idea and their answers, return a small JSON object with these fields ONLY.
-
-USER IDEA: {user_input}
-
-USER ANSWERS:
-{qa_context}
-
-Return ONLY this JSON (no markdown, no explanation):
-{{
-  "title": "4-6 word title for this prompt",
-  "summary": "One sentence about what this prompt accomplishes"
-}}"""
-
-    try:
-        response = await client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=500
-        )
-
-        content = response.choices[0].message.content.strip()
-        cleaned = clean_json_content(content)
-        if cleaned.startswith('{') and not cleaned.endswith('}'):
-            cleaned += '\n}'
-
-        return json.loads(cleaned)
-    except Exception as e:
-        print("EXCEPTION parsing metadata:", e)
-        return {
-            "title": "Your Smart Prompt",
-            "summary": "A detailed AI prompt based on your inputs."
-        }
-
 
 # =========================
 # PROMPT SCORING FEATURE
@@ -306,11 +243,11 @@ Evaluate the provided prompt out of 100 based on the following rigorous criteria
 Be critical: most average prompts should score between 40-60. Only truly exceptional, production-ready prompts should score above 85.
 
 CRITERIA:
-1. Persona & Role (0-20): Does it define a specific, expert persona with clear perspective?
-2. Task Clarity & Logic (0-20): Are the instructions unambiguous? Is the logic sound?
-3. Context & Knowledge (0-20): Does it provide sufficient background and reference data?
-4. Guardrails & Safety (0-20): Does it include negative constraints (what NOT to do) and edge-case handling?
-5. Structure & Formatting (0-20): Does it use clear headers, delimiters, and specify a precise output schema?
+1. Persona & Role (0-20): Replace vague personas ("You are an AI") with credentialed ones. MUST include a Boundary Statement (what it won't do) and adaptive fallback for educational tasks.
+2. Task Clarity & Logic (0-20): Break tasks into numbered steps with explicit action verbs. MUST include estimated durations and milestone outcomes for each step.
+3. Context & Knowledge (0-20): Provide background data, include a detailed User/Learner Profile (time, goals, style), and at least one concrete example of success. For technical tasks, ensure a specific DBMS like PostgreSQL is named.
+4. Guardrails & Safety (0-20): Include 2–3 explicit "Do NOT" rules, behavioral rules instead of tone rules (including 3 MCQs per section and analogy-first fallback), and hallucination safeguards (version context + explicit hedging if unsure of syntax).
+5. Structure & Formatting (0-20): Use clear headers. Educational prompts must specify "3 MCQs with explanations and 1 mini coding challenge with expected output" per section, learning objectives per section, and prioritize depth. End with an exact output schema.
 
 Prompt to evaluate: 
 {prompt}
@@ -351,6 +288,13 @@ async def rewrite_prompt_step2(prompt: str, evaluation_json: dict) -> str:
 Feedback: {json.dumps(evaluation_json)}
 Original: {prompt}
 Rewrite it to be better. 
+
+Follow these specific rules for the rewrite:
+1. Replace vague personas ("You are an AI") with credentialed ones. Add a Boundary Statement (what the AI will NOT do) and adaptive fallback protocol for educational tasks.
+2. Break the task into numbered steps with explicit action verbs. Add estimated durations and milestone outcomes to each step.
+3. Add a detailed User/Learner Profile (time, goals, style) and at least one concrete example in the Context/Background section. For technical tasks, name PostgreSQL as the specific DBMS.
+4. Replace vague tone rules with behavioral rules: "Define new concepts in one plain-English sentence before use", "Include 3 MCQs per section with answer explanations", "If a concept needs re-explaining, use a real-world analogy first". Write 2–3 explicit "Do NOT" rules and a "Hallucination Safeguard" (version context + explicit hedging if unsure of syntax).
+5. Educational prompts must specify "3 MCQs with explanations and 1 mini coding challenge with expected output" per section, learning objectives per section, and prioritize depth over brevity. End with an exact output schema.
 
 CRITICAL:
 1. Ensure the output is an EXECUTION PROMPT that immediately completes the user's task when pasted into an LLM.

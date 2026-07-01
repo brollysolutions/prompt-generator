@@ -8,6 +8,57 @@ class SmartPromptUser(HttpUser):
     def home(self):
         self.client.get("/")
 
+    # Designed Prompt for Question Generation
+    QUESTION_GENERATION_PROMPT = """
+    You are the **Lead Requirements Architect**, a world-class expert in information elicitation and prompt engineering. Your goal is to analyze a raw user idea and generate "High-Reasoning Clarification Questions" that will enable the creation of a production-ready AI tool.
+
+    ### # Analysis Protocol
+    Before generating questions, perform a domain-specific audit of the input:
+    1. **Technical:** Identify the stack, environment, and scale.
+    2. **Creative/Logic:** Determine the tone, perspective, and intended reasoning depth.
+    3. **Missing Links:** Find the "invisible variables" that would lead to a generic output if not defined.
+
+    ### # Task
+    Analyze the following user idea and generate 5-7 highly relevant, clear, and context-aware questions.
+    **IDEA:** "{user_input}"
+
+    ### # Question Constraints
+    - **Anti-Generic:** DO NOT ask "What is your goal?" or "Who is the audience?" generically. Instead, tailor them: "For this SaaS tool, is the target user a technical project manager or a non-technical small business owner?"
+    - **Diversity:** Cover objectives, technical challenges, specific use cases, and missing constraints.
+    - **Uniqueness:** Each question must extract a distinct variable that significantly changes the final AI output.
+    - **Tone:** Professional, direct, and insightful.
+
+    ### # Expected Output Format
+    Respond ONLY with a JSON object. No conversational filler or meta-comments.
+    {{
+      "questions": [
+        {{
+          "question": "Clear and specific question text",
+          "type": "radio | checkbox | dropdown | text | textarea",
+          "options": ["If radio/checkbox/dropdown, provide 3-5 specific, smart options", "..."]
+        }}
+      ]
+    }}
+    """
+
+    # Designed Prompt for Final Prompt Generation
+    FINAL_PROMPT_GENERATION_PROMPT = """    
+    Act as an expert AI prompt engineer and design a prompt that takes an input idea and responses from the generated questions and generate a set of highly relevant, clear, and context-aware Prompt. 
+    
+    ### # Context
+    - **Input Idea:** "{user_input}"
+    - **User Responses:** {qa_context}
+    
+    ### # Task
+    The Prompt should cover the key aspects, objectives, challenges, use cases, and important details related to the idea and responses from the generated questions, while avoiding ambiguity, repetition, and irrelevant content. 
+    
+    ### # Final Optimization
+    Based on this generated prompt, create a final optimized prompt that can consistently produce accurate, comprehensive, and contextually aware results, ensuring high-quality output suitable for downstream AI processing.
+    
+    ### # Output Format
+    Return ONLY the final optimized prompt text.
+    """
+
     @task(3)
     def generate_questions(self):
         ideas = [
@@ -38,6 +89,11 @@ class SmartPromptUser(HttpUser):
             "target_ai": "ChatGPT"
         })
 
+    # Designed Prompt for Score Generation
+    SCORE_GENERATION_PROMPT = """
+    Act as an expert AI prompt engineer and design a prompt that takes generated final prompt as input and generates a set of highly relevant, clear, and context-aware score . The generated score should cover the key aspects, objectives, challenges, use cases, and important details related to the idea while avoiding ambiguity, repetition, and irrelevant content. Based on these generated prompt, create a final optimized score that can consistently produce accurate, comprehensive, and contextually relevant score for any given idea, ensuring high-quality output suitable for downstream AI processing.
+    """
+
     @task(2)
     def score_prompt(self):
         prompts = [
@@ -46,3 +102,4 @@ class SmartPromptUser(HttpUser):
             "Explain how to use FastAPI to build a REST API with Pydantic models."
         ]
         self.client.post("/score-prompt", json={"prompt": random.choice(prompts)})
+

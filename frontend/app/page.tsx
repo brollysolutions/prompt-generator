@@ -1,14 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import Link from "next/link";
 
 import { GradientButton } from "@/components/ui/gradient-button";
 
 export default function Home() {
-  const router = useRouter();
-
   return (
     <div style={{
       minHeight: "100vh",
@@ -21,43 +17,6 @@ export default function Home() {
       overflow: "hidden",
       position: "relative"
     }}>
-      {/* Navigation for Library/History */}
-      <div style={{
-        position: "absolute",
-        top: "30px",
-        right: "40px",
-        zIndex: 100,
-        display: "flex",
-        gap: "15px"
-      }}>
-        <Link href="/library" style={{
-          textDecoration: "none",
-          background: "rgba(212, 175, 55, 0.1)",
-          border: "1px solid rgba(212, 175, 55, 0.3)",
-          color: "#AA8A27",
-          padding: "10px 20px",
-          borderRadius: "12px",
-          fontSize: "14px",
-          fontWeight: 600,
-          transition: "all 0.3s"
-        }}>
-          Library
-        </Link>
-        <Link href="/history" style={{
-          textDecoration: "none",
-          background: "rgba(212, 175, 55, 0.1)",
-          border: "1px solid rgba(212, 175, 55, 0.3)",
-          color: "#AA8A27",
-          padding: "10px 20px",
-          borderRadius: "12px",
-          fontSize: "14px",
-          fontWeight: 600,
-          transition: "all 0.3s"
-        }}>
-          History
-        </Link>
-      </div>
-
       {/* Full Page Background Waves */}
       <div className="bg-wave-container">
         <svg className="waves" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
@@ -144,22 +103,22 @@ export default function Home() {
         .parallax > use:nth-child(1) {
           animation-delay: -2s;
           animation-duration: 7s;
-          fill: rgba(255, 222, 77, 0.4);
+          fill: rgba(255, 201, 0, 0.4);
         }
         .parallax > use:nth-child(2) {
           animation-delay: -3s;
-          animation-duration: 10s;
-          fill: rgba(255, 178, 44, 0.3);
+          animation-duration: 100vh;
+          fill: rgba(255, 225, 0, 0.3);
         }
         .parallax > use:nth-child(3) {
           animation-delay: -4s;
           animation-duration: 13s;
-          fill: rgba(248, 222, 34, 0.2);
+          fill: rgba(254, 186, 23, 0.2);
         }
         .parallax > use:nth-child(4) {
           animation-delay: -5s;
           animation-duration: 20s;
-          fill: rgba(243, 243, 243, 0.8);
+          fill: #F3F3F3;
         }
         @keyframes move-forever {
           0% {

@@ -35,7 +35,7 @@ const ANIMATION_CONFIG = {
     stiffness: 400,
     damping: 40,
     mass: 0.8,
-  },
+  } as const,
 }
 
 type StatusIconProps = {

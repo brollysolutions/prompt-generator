@@ -3,3 +3,9 @@ uvicorn
 groq
 python-dotenv
 httpx
+passlib[bcrypt]
+pyjwt
+bcrypt
+google-auth
+gunicorn
+requests
