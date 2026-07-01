@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Copy, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown } from "lucide-react";
+import { Copy, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, Globe } from "lucide-react";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -24,6 +24,7 @@ type LibraryPrompt = {
   tags: string[];
   category: string;
   created_at: string;
+  is_published?: boolean;
 };
 
 export default function LibraryPage() {
@@ -36,6 +37,10 @@ export default function LibraryPage() {
   const [settingsApiModel, setSettingsApiModel] = useState("");
   const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
   const [prompts, setPrompts] = useState<LibraryPrompt[]>([]);
+  const [publishedIds, setPublishedIds] = useState<Record<number, boolean>>({});
+  const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [publishModalPrompt, setPublishModalPrompt] = useState<LibraryPrompt | null>(null);
+  const [publishMessage, setPublishMessage] = useState<{ text: string, isError: boolean } | null>(null);
 
   // Load configuration for settings
   useEffect(() => {
@@ -83,6 +88,15 @@ const fetchLibrary = async () => {
     const response = await fetch(`http://127.0.0.1:8000/library?user_id=${user.id}`);
     const data = await response.json();
     setPrompts(data.prompts || []);
+    
+    // Initialize published state from backend
+    const publishedState: Record<number, boolean> = {};
+    (data.prompts || []).forEach((p: any) => {
+      if (p.is_published) {
+        publishedState[p.id] = true;
+      }
+    });
+    setPublishedIds(publishedState);
   } catch (error) {
     console.error("Failed to fetch library", error);
   }
@@ -98,6 +112,34 @@ useEffect(() => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handlePublish = async () => {
+    if (!user || !publishModalPrompt) return;
+    try {
+      setPublishingId(publishModalPrompt.id);
+      const response = await fetch("http://127.0.0.1:8000/community/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          library_prompt_id: publishModalPrompt.id,
+          user_id: user.id,
+          email: user.email
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setPublishedIds(prev => ({ ...prev, [publishModalPrompt.id]: true }));
+        setPublishMessage({ text: data.already_published ? "This prompt is already in the community library!" : "Prompt published to the community library successfully!", isError: false });
+      } else {
+        setPublishMessage({ text: "Failed to publish prompt to community: " + (data.detail || "Unknown error"), isError: true });
+      }
+    } catch (error) {
+      console.error("Failed to publish to community", error);
+      setPublishMessage({ text: "Error publishing prompt.", isError: true });
+    } finally {
+      setPublishingId(null);
+    }
   };
 
   const filteredPrompts = prompts.filter((p) => {
@@ -161,6 +203,20 @@ useEffect(() => {
                   }}
                 >
                   History
+                </Link>
+                <Link 
+                  href="/community"
+                  style={{
+                  padding: "8px 16px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#ffffff",
+                  background: "#000000",
+                  borderRadius: "10px",
+                  textDecoration: "none"
+                  }}
+                >
+                  Community
                 </Link>
                 <div style={{ position: "relative" }}>
                   <button
@@ -352,6 +408,27 @@ useEffect(() => {
                           {p.category}
                         </span>
                         <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            onClick={() => {
+                              setPublishModalPrompt(p);
+                              setPublishMessage(null);
+                            }}
+                            disabled={publishedIds[p.id] || publishingId === p.id}
+                            style={{
+                              background: publishedIds[p.id] ? "#10b981" : "#3b82f6",
+                              border: "none",
+                              borderRadius: "10px",
+                              padding: "6px 12px",
+                              color: "#fff",
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              cursor: (publishedIds[p.id] || publishingId === p.id) ? "default" : "pointer",
+                              transition: "all 0.2s ease",
+                              opacity: publishingId === p.id ? 0.7 : 1
+                            }}
+                          >
+                            {publishingId === p.id ? "Publishing..." : publishedIds[p.id] ? "Published" : "Public"}
+                          </button>
                           <button
                             onClick={() => handleCopy(p.prompt_text, p.id)}
                             style={{
@@ -739,6 +816,80 @@ useEffect(() => {
                   >
                     Close
                   </button>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Publish Modal */}
+          <AnimatePresence>
+            {publishModalPrompt && (
+              <div style={{
+                position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+                background: "rgba(0, 0, 0, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px"
+              }}>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  style={{
+                    background: "#ffffff", border: "1px solid rgba(212, 175, 55, 0.3)",
+                    borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "400px",
+                    boxShadow: "0 20px 40px rgba(0,0,0,0.1)", position: "relative",
+                    display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center"
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setPublishModalPrompt(null);
+                      setPublishMessage(null);
+                    }}
+                    style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}
+                  >
+                    <X size={20} />
+                  </button>
+                  
+                  <div style={{
+                    width: "48px", height: "48px", background: "rgba(59, 130, 246, 0.1)",
+                    borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center",
+                    margin: "0 auto 16px", color: "#3b82f6"
+                  }}>
+                    <Globe size={24} />
+                  </div>
+                  
+                  <h2 style={{ color: "#000000", fontSize: "20px", fontWeight: 800, margin: "0 0 8px 0" }}>Publish to Community?</h2>
+                  
+                  {publishMessage ? (
+                    <div style={{
+                      background: publishMessage.isError ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                      color: publishMessage.isError ? "#ef4444" : "#10b981",
+                      padding: "16px", borderRadius: "12px", fontSize: "14px", fontWeight: 500, margin: "16px 0", width: "100%"
+                    }}>
+                      {publishMessage.text}
+                    </div>
+                  ) : (
+                    <p style={{ color: "#6B7280", fontSize: "14px", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+                      Are you sure you want to make the prompt <strong>"{publishModalPrompt.name}"</strong> visible to everyone? This action cannot be undone.
+                    </p>
+                  )}
+                  
+                  <div style={{ display: "flex", gap: "12px", width: "100%", marginTop: publishMessage ? "16px" : "0" }}>
+                    {publishMessage ? (
+                      <button onClick={() => { setPublishModalPrompt(null); setPublishMessage(null); }} style={{
+                        flex: 1, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "12px", color: "#4b5563", fontSize: "14px", fontWeight: 600, cursor: "pointer"
+                      }}>Close</button>
+                    ) : (
+                      <>
+                        <button onClick={() => { setPublishModalPrompt(null); setPublishMessage(null); }} style={{
+                          flex: 1, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "12px", color: "#4b5563", fontSize: "14px", fontWeight: 600, cursor: "pointer"
+                        }}>Cancel</button>
+                        <button onClick={handlePublish} disabled={publishingId !== null} style={{
+                          flex: 1, background: "#3b82f6", border: "none", borderRadius: "12px", padding: "12px", color: "#ffffff", fontSize: "14px", fontWeight: 600, cursor: publishingId !== null ? "default" : "pointer", opacity: publishingId !== null ? 0.7 : 1
+                        }}>{publishingId !== null ? "Publishing..." : "Make Public"}</button>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               </div>
             )}

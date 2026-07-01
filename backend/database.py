@@ -45,6 +45,26 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS community_prompts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            prompt_text TEXT NOT NULL,
+            tags TEXT NOT NULL,
+            category TEXT NOT NULL,
+            author_id INTEGER NOT NULL,
+            author_email TEXT NOT NULL,
+            upvotes INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS community_upvotes (
+            user_id INTEGER NOT NULL,
+            prompt_id INTEGER NOT NULL,
+            PRIMARY KEY (user_id, prompt_id)
+        )
+    ''')
     
     # Migration: Add user_id to library_prompts if it doesn't exist
     try:
@@ -207,10 +227,11 @@ def get_library_prompts(user_id: int = 0):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, name, prompt_text, tags, category, created_at, user_id
-        FROM library_prompts
-        WHERE user_id = ?
-        ORDER BY created_at DESC
+        SELECT l.id, l.name, l.prompt_text, l.tags, l.category, l.created_at, l.user_id,
+               EXISTS(SELECT 1 FROM community_prompts c WHERE c.author_id = l.user_id AND c.prompt_text = l.prompt_text) as is_published
+        FROM library_prompts l
+        WHERE l.user_id = ?
+        ORDER BY l.created_at DESC
     ''', (user_id,))
     rows = cursor.fetchall()
     prompts = []
@@ -220,8 +241,117 @@ def get_library_prompts(user_id: int = 0):
             d['tags'] = json.loads(d['tags'])
         except:
             d['tags'] = []
+        d['is_published'] = bool(d.get('is_published', 0))
         prompts.append(d)
     conn.close()
     return prompts
+
+def publish_to_community(library_prompt_id: int, author_id: int, author_email: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Check if prompt exists in library
+    cursor.execute('SELECT name, prompt_text, tags, category FROM library_prompts WHERE id = ?', (library_prompt_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+        
+    name, prompt_text, tags, category = row
+    
+    # Check if this user already published this exact prompt text to the community
+    cursor.execute('SELECT id FROM community_prompts WHERE author_id = ? AND prompt_text = ?', (author_id, prompt_text))
+    existing = cursor.fetchone()
+    if existing:
+        conn.close()
+        return {"id": existing[0], "already_published": True}
+        
+    cursor.execute('''
+        INSERT INTO community_prompts (name, prompt_text, tags, category, author_id, author_email, upvotes)
+        VALUES (?, ?, ?, ?, ?, ?, 0)
+    ''', (name, prompt_text, tags, category, author_id, author_email))
+    
+    new_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return {"id": new_id, "already_published": False}
+
+def get_community_prompts(user_id: int = 0, sort_by: str = "trending"):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    order_by_clause = "c.upvotes DESC, c.created_at DESC" if sort_by == "trending" else "c.created_at DESC"
+    
+    cursor.execute(f'''
+        SELECT c.id, c.name, c.prompt_text, c.tags, c.category, c.author_email, c.upvotes, c.created_at,
+               (SELECT 1 FROM community_upvotes u WHERE u.prompt_id = c.id AND u.user_id = ?) as has_upvoted
+        FROM community_prompts c
+        ORDER BY {order_by_clause}
+    ''', (user_id,))
+    
+    rows = cursor.fetchall()
+    prompts = []
+    for row in rows:
+        d = dict(row)
+        try:
+            d['tags'] = json.loads(d['tags'])
+        except:
+            d['tags'] = []
+        d['has_upvoted'] = bool(d['has_upvoted'])
+        prompts.append(d)
+    conn.close()
+    return prompts
+
+def upvote_community_prompt(user_id: int, prompt_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Check if already upvoted
+    cursor.execute('SELECT 1 FROM community_upvotes WHERE user_id = ? AND prompt_id = ?', (user_id, prompt_id))
+    has_upvoted = cursor.fetchone()
+    
+    if has_upvoted:
+        # Remove upvote
+        cursor.execute('DELETE FROM community_upvotes WHERE user_id = ? AND prompt_id = ?', (user_id, prompt_id))
+        cursor.execute('UPDATE community_prompts SET upvotes = MAX(0, upvotes - 1) WHERE id = ?', (prompt_id,))
+        upvoted = False
+    else:
+        # Add upvote
+        cursor.execute('INSERT INTO community_upvotes (user_id, prompt_id) VALUES (?, ?)', (user_id, prompt_id))
+        cursor.execute('UPDATE community_prompts SET upvotes = upvotes + 1 WHERE id = ?', (prompt_id,))
+        upvoted = True
+        
+    # Get updated upvotes count
+    cursor.execute('SELECT upvotes FROM community_prompts WHERE id = ?', (prompt_id,))
+    row = cursor.fetchone()
+    new_upvotes = row[0] if row else 0
+    
+    conn.commit()
+    conn.close()
+    return {"upvoted": upvoted, "upvotes": new_upvotes}
+
+def save_community_prompt_to_library(user_id: int, community_prompt_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT name, prompt_text, tags, category FROM community_prompts WHERE id = ?', (community_prompt_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+        
+    name, prompt_text, tags, category = row
+    
+    # Save it to user's library using existing JSON tags string
+    cursor.execute('''
+        INSERT INTO library_prompts (name, prompt_text, tags, category, user_id)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (name + " (Remix)", prompt_text, tags, category, user_id))
+    
+    new_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return new_id
 
 init_db()

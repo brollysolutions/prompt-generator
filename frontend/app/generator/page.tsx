@@ -402,6 +402,20 @@ export default function GeneratorPage() {
                 >
                   History
                 </Link>
+                <Link 
+                  href="/community"
+                  style={{
+                  padding: "8px 16px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#ffffff",
+                  background: "#000000",
+                  borderRadius: "10px",
+                  textDecoration: "none"
+                  }}
+                >
+                  Community
+                </Link>
                 <button
                   onClick={() => {
                     const keysToRemove = [
