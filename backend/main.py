@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 import logging
 import os
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 import jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
@@ -20,11 +21,13 @@ logger = logging.getLogger(__name__)
 
 from services.groq_service import (
     generate_questions,
-    generate_final_prompt,
     process_prompt_scoring,
     enhance_prompt_text,
     test_generated_prompt,
     auto_categorize_prompt
+)
+from services.gemini_service import (
+    generate_final_prompt
 )
 from database import (
     save_prompt_version, 

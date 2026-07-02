@@ -9,11 +9,28 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from database import save_prompt_score
 
-load_dotenv()
+load_dotenv(override=True)
 
-client = AsyncGroq(
-    api_key=os.getenv("GROQ_API_KEY")
-)
+import random
+
+def get_client():
+    keys = []
+    for i in range(1, 20):
+        key = os.getenv(f"GROQ_API_KEY_{i}")
+        if key:
+            keys.append(key)
+    
+    if not keys:
+        key = os.getenv("GROQ_API_KEY")
+        if key:
+            keys.append(key)
+            
+    if not keys:
+        raise ValueError("No GROQ_API_KEY found in .env")
+        
+    chosen_key = random.choice(keys)
+    print(f"\n[DEBUG] 🚀 Using Groq API Key ending in: ...{chosen_key[-4:]}\n")
+    return AsyncGroq(api_key=chosen_key)
 
 # Helper to strip markdown JSON blocks and conversational text
 def clean_json_content(content: str) -> str:
@@ -92,7 +109,7 @@ Return ONLY a JSON object matching this exact schema:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await get_client().chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
@@ -209,7 +226,7 @@ Return ONLY a JSON object matching this schema:
   "quality_feedback": ["Feedback 1", "Feedback 2"]
 }}"""
 
-        response = await client.chat.completions.create(
+        response = await get_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
@@ -218,6 +235,13 @@ Return ONLY a JSON object matching this schema:
         )
 
         result_content = response.choices[0].message.content.strip()
+        if result_content.startswith("```json"):
+            result_content = result_content[7:]
+        if result_content.startswith("```"):
+            result_content = result_content[3:]
+        if result_content.endswith("```"):
+            result_content = result_content[:-3]
+        result_content = result_content.strip()
         final_data = json.loads(result_content)
         
         # Add internal tracking fields
@@ -268,14 +292,21 @@ Return ONLY a JSON object. Do not include any explanations outside the JSON.
   ]
 }}"""
     try:
-        response = await client.chat.completions.create(
+        response = await get_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": eval_prompt}],
             temperature=0.1,
             max_tokens=1000,
             response_format={"type": "json_object"}
         )
-        content = response.choices[0].message.content
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
         return json.loads(content)
     except Exception as e:
         print(f"EXCEPTION in score_prompt_step1: {str(e)}")
@@ -302,7 +333,7 @@ CRITICAL:
 2. DO NOT ask the AI to "write a prompt".
 3. Return ONLY the text of the new master execution prompt."""
     try:
-        response = await client.chat.completions.create(
+        response = await get_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": rewrite_prompt}],
             temperature=0.4,
@@ -318,7 +349,13 @@ async def process_prompt_scoring(prompt: str) -> dict:
         eval_json = await score_prompt_step1(prompt)
         criteria = eval_json.get("criteria", {})
         suggestions = eval_json.get("suggestions", [])
-        final_score = sum(criteria.values()) if isinstance(criteria, dict) else 0
+        final_score = 0
+        if isinstance(criteria, dict):
+            for v in criteria.values():
+                try:
+                    final_score += int(v)
+                except (ValueError, TypeError):
+                    pass
         rewritten_prompt = await rewrite_prompt_step2(prompt, eval_json)
         
         try:
@@ -338,7 +375,7 @@ async def process_prompt_scoring(prompt: str) -> dict:
 async def enhance_prompt_text(original_prompt: str, instruction: str) -> str:
     """Refine a prompt based on specific user feedback."""
     try:
-        chat_completion = await client.chat.completions.create(
+        chat_completion = await get_client().chat.completions.create(
             messages=[
                 {
                     "role": "system",
@@ -378,7 +415,7 @@ Furthermore, engage in deep thinking and reasoning. Simulate the advanced reason
 async def test_generated_prompt(prompt: str) -> str:
     """Sends the generated prompt to the LLM and returns its response."""
     try:
-        response = await client.chat.completions.create(
+        response = await get_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": TEST_PROMPT_SYSTEM_INSTRUCTION},
@@ -414,7 +451,7 @@ Return ONLY a JSON object matching this schema:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await get_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
