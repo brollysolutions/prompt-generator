@@ -363,56 +363,24 @@ export default function GeneratorPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <nav style={{
-            background: "#ffffff",
-            borderBottom: "1px solid #D4AF37",
-            padding: "16px 24px",
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-          }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
+            <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
+              <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
                 <Link 
                   href="/library"
-                  style={{
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  background: "#000000",
-                  borderRadius: "10px",
-                  textDecoration: "none"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
                   Library
                 </Link>
                 <Link 
                   href="/history"
-                  style={{
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  background: "#000000",
-                  borderRadius: "10px",
-                  textDecoration: "none"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
                   History
                 </Link>
                 <Link 
                   href="/community"
-                  style={{
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  background: "#000000",
-                  borderRadius: "10px",
-                  textDecoration: "none"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
                   Community
                 </Link>
@@ -431,33 +399,15 @@ export default function GeneratorPage() {
                     keysToRemove.forEach(key => localStorage.removeItem(key));
                     window.location.reload();
                   }}
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#ffffff",
-                    background: "#000000",
-                    border: "none",
-                    borderRadius: "10px",
-                    cursor: "pointer"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black border-none rounded-[8px] md:rounded-[10px] cursor-pointer shrink-0"
                 >
                   Reset
                 </button>
-                <div style={{ position: "relative" }}>
+              </div>
+              <div className="relative shrink-0 ml-1">
                   <button
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "8px",
-                      background: "rgba(212, 175, 55, 0.1)",
-                      border: "1px solid #D4AF37",
-                      borderRadius: "50%",
-                      cursor: "pointer",
-                      color: "#AA8A27"
-                    }}
+                    className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
                   >
                     <User size={18} />
                   </button>
@@ -519,7 +469,6 @@ export default function GeneratorPage() {
                       </button>
                     </div>
                   )}
-                </div>
               </div>
             </div>
           </nav>
@@ -541,23 +490,14 @@ export default function GeneratorPage() {
           </div>
 
           <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ maxWidth: "900px", margin: "0 auto", padding: "50px 24px 80px" }}>
+            <div className="max-w-[900px] mx-auto px-4 py-8 md:px-6 md:py-12 md:pb-20">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               id="generator-wrapper"
             >
               {/* Input Card with Static Gold Border */}
-              <div style={{
-                background: "rgba(255, 255, 255, 0.7)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(212, 175, 55, 0.5)",
-                padding: "32px",
-                width: "100%",
-                borderRadius: "24px",
-                marginBottom: "28px",
-                boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
-              }}>
+              <div className="bg-white/70 backdrop-blur-md border border-[#D4AF37]/50 p-5 md:p-8 w-full rounded-3xl mb-7 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                   <label style={{ color: "#D4AF37", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px" }}>
                     Your Idea
@@ -601,15 +541,7 @@ export default function GeneratorPage() {
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.7)",
-                      backdropFilter: "blur(12px)",
-                      border: "1px solid rgba(212, 175, 55, 0.5)",
-                      borderRadius: "24px",
-                      padding: "32px",
-                      marginBottom: "28px",
-                      boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
-                    }}
+                    className="bg-white/70 backdrop-blur-md border border-[#D4AF37]/50 rounded-[24px] p-5 md:p-8 mb-7 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]"
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
                       <div style={{
@@ -621,10 +553,10 @@ export default function GeneratorPage() {
                         color: "#000000"
                       }}>❓</div>
                       <div>
-                        <h2 style={{ color: "#000000", fontSize: "22px", fontWeight: 700, margin: 0 }}>
+                        <h2 className="text-black text-lg md:text-[22px] font-bold m-0">
                           AI Follow-up Questions
                         </h2>
-                        <p style={{ color: "#D4AF37", fontSize: "13px", margin: "3px 0 0" }}>
+                        <p className="text-[#D4AF37] text-xs md:text-[13px] mt-1 mb-0">
                           Answer these to generate a precise smart prompt
                         </p>
                       </div>
@@ -641,14 +573,7 @@ export default function GeneratorPage() {
                     {questions.map((q, index) => (
                       <div
                         key={index}
-                        style={{
-                          marginBottom: "22px",
-                          padding: "22px",
-                          background: "#f9fafb",
-                          borderRadius: "16px",
-                          border: "1px solid #D4AF37",
-                          transition: "border-color 0.2s",
-                        }}
+                        className="mb-5 p-4 md:p-6 bg-[#f9fafb] rounded-2xl border border-[#D4AF37] transition-colors duration-200"
                       >
                         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "14px" }}>
                           <div style={{
@@ -961,12 +886,7 @@ export default function GeneratorPage() {
                     overflow: "hidden",
                     boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
                   }}>
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "16px 24px",
-                      background: "rgba(249, 250, 251, 0.5)",
-                      borderBottom: "1px solid #D4AF37",
-                    }}>
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:p-6 bg-[#f9fafb]/50 border-b border-[#D4AF37] gap-4">
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <ShieldCheck size={20} color="#D4AF37" />
                         <span style={{ color: "#000000", fontWeight: 700 }}>Your Smart Prompt</span>
@@ -994,11 +914,7 @@ export default function GeneratorPage() {
                     </div>
 
                     {finalPrompt.quality_score !== undefined && (
-                      <div style={{ 
-                        padding: "24px 32px", 
-                        background: "rgba(243, 244, 246, 0.5)", 
-                        borderBottom: "1px solid #D4AF37" 
-                      }}>
+                      <div className="p-4 md:px-8 md:py-6 bg-[#f3f4f6]/50 border-b border-[#D4AF37]">
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                             <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#000000" }}>Quality Audit</h3>
@@ -1036,7 +952,7 @@ export default function GeneratorPage() {
                               exit={{ height: 0, opacity: 0 }}
                               style={{ overflow: "hidden" }}
                             >
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
                                 {finalPrompt.quality_breakdown && Object.entries(finalPrompt.quality_breakdown).map(([key, val]) => (
                                   <div key={key} style={{ background: "rgba(255, 255, 255, 0.6)", padding: "14px", borderRadius: "12px", border: "1px solid rgba(229, 231, 235, 0.5)" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -1075,7 +991,7 @@ export default function GeneratorPage() {
                       </div>
                     )}
 
-                    <div style={{ padding: "28px 32px" }}>
+                    <div className="p-4 md:p-8">
                       <div className="markdown-content" style={{ color: "#1f2937", fontSize: "15px", lineHeight: 1.7 }}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {"```markdown\n" + (finalPrompt.smart_prompt || finalPrompt.final_instruction || finalPrompt.final_prompt || "") + "\n```"}
@@ -1084,15 +1000,9 @@ export default function GeneratorPage() {
                     </div>
                   </div>
 
-                  <div style={{
-                    marginTop: "30px",
-                    background: "rgba(255, 255, 255, 0.7)",
-                    backdropFilter: "blur(12px)",
-                    border: "2px solid rgba(212, 175, 55, 0.6)",
-                    borderRadius: "24px",
-                    padding: "32px",
-                    boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
-                  }}>
+                  <div
+                    className="mt-8 bg-white/70 backdrop-blur-md border-2 border-[#D4AF37]/60 rounded-3xl p-5 md:p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]"
+                  >
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                       <Play size={24} fill="#000000" />
                       <h2 style={{ color: "#000000", margin: 0, fontSize: "22px", fontWeight: 700 }}>Test Prompt</h2>
@@ -1124,7 +1034,7 @@ export default function GeneratorPage() {
                       >
                         <div style={{ position: "relative", zIndex: 1 }}>
                           <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "20px", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>AI Strategic Response</div>
-                          <div className="markdown-content">
+                          <div className="markdown-content overflow-x-auto overflow-y-hidden max-w-full">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {testResponse}
                             </ReactMarkdown>
@@ -1159,16 +1069,7 @@ export default function GeneratorPage() {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            style={{
-              background: "#ffffff",
-              border: "1px solid rgba(212, 175, 55, 0.3)",
-              borderRadius: "24px",
-              padding: "32px",
-              width: "100%",
-              maxWidth: "450px",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-              position: "relative"
-            }}
+            className="bg-white border border-[#D4AF37]/30 rounded-[24px] p-6 md:p-8 w-full max-w-[450px] shadow-[0_20px_40px_rgba(0,0,0,0.1)] relative"
           >
             <button
               onClick={() => setIsSettingsOpen(false)}
@@ -1412,8 +1313,10 @@ export default function GeneratorPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 8px; height: 0px; }
         ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .scrollbar-hide::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+        .scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
         body { background: #F3F3F3 !important; overflow-x: hidden; }
 
         .bg-wave-container {

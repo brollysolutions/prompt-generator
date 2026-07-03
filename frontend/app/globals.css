@@ -46,3 +46,39 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+option {
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #000;
+}
+
+/* Hide scrollbar for containers that use .scrollbar-hide */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+.markdown-content th, .markdown-content td {
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 8px;
+  text-align: left;
+}
+.markdown-content th {
+  background-color: rgba(212, 175, 55, 0.1);
+  font-weight: 600;
+}

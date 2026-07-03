@@ -41,8 +41,8 @@ export default function Home() {
             duration: 1,
             ease: "easeOut",
           }}
-          style={{ fontFamily: "'Merriweather', serif", fontWeight: 400, width: "250%" }}
-          className="bg-gradient-to-r from-[#D4AF37] via-[#AA8A27] to-[#D4AF37] bg-[length:200%_auto] animate-shimmer py-4 bg-clip-text text-4xl tracking-normal text-transparent md:text-7xl"
+          style={{ fontFamily: "'Merriweather', serif", fontWeight: 400, width: "100%", maxWidth: "100%" }}
+          className="bg-gradient-to-r from-[#D4AF37] via-[#AA8A27] to-[#D4AF37] bg-[length:200%_auto] animate-shimmer py-4 bg-clip-text text-4xl md:text-7xl tracking-normal text-transparent"
         >
           Smart Prompt <br /> Generator
         </motion.h1>
@@ -56,7 +56,7 @@ export default function Home() {
           }}
           className="mt-6 flex flex-col items-center gap-6"
         >
-          <p className="max-w-2xl text-[#8A7322] text-xl md:text-2xl font-medium drop-shadow-[0_0_15px_rgba(212,175,55,0.2)]">
+          <p className="max-w-2xl text-[#8A7322] text-lg md:text-2xl font-medium drop-shadow-[0_0_15px_rgba(212,175,55,0.2)] px-4">
             Describe your idea → Answer AI questions → Get a professional, copy-ready prompt for any AI tool.
           </p>
           <div className="mt-8">
@@ -107,7 +107,7 @@ export default function Home() {
         }
         .parallax > use:nth-child(2) {
           animation-delay: -3s;
-          animation-duration: 100vh;
+          animation-duration: 10s;
           fill: rgba(255, 225, 0, 0.3);
         }
         .parallax > use:nth-child(3) {

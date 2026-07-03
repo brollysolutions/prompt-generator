@@ -85,31 +85,22 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100dvh",
+      width: "100%",
+      overflowY: "auto",
+      overflowX: "hidden",
       background: "#F3F4F4",
       display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
+      flexDirection: "column",
       fontFamily: "'Inter', sans-serif",
-      padding: "20px",
+      padding: "16px",
+      boxSizing: "border-box",
       position: "relative"
     }}>
       {/* Back to Home Button */}
       <Link 
         href="/" 
-        style={{ 
-          position: "absolute", 
-          top: "30px", 
-          left: "30px", 
-          display: "flex", 
-          alignItems: "center", 
-          gap: "8px", 
-          color: "#D4AF37", 
-          textDecoration: "none", 
-          fontWeight: 700,
-          fontSize: "15px",
-          zIndex: 10
-        }}
+        className="absolute top-[16px] left-[16px] md:top-[30px] md:left-[30px] flex items-center gap-[8px] text-[#D4AF37] no-underline font-bold text-[14px] md:text-[15px] z-10"
       >
         <House size={20} />
         Back To Home
@@ -130,34 +121,24 @@ export default function LoginPage() {
         </svg>
       </div>
 
+      <div style={{ flex: 1, minHeight: "0px" }}></div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        style={{
-          background: "rgba(255, 255, 255, 0.8)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid rgba(212, 175, 55, 0.5)",
-          borderRadius: "24px",
-          padding: "40px",
-          width: "100%",
-          maxWidth: "450px",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-          position: "relative",
-          zIndex: 1
-        }}
+        className="shrink-0 mx-auto bg-white/80 backdrop-blur-md border border-[#D4AF37]/50 rounded-[24px] py-6 px-5 md:p-10 w-full max-w-[450px] shadow-[0_20px_40px_rgba(0,0,0,0.1)] relative z-10"
       >
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
           <div style={{
-            width: "64px", height: "64px",
+            width: "56px", height: "56px",
             background: "#F4CE14",
             borderRadius: "16px",
             display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 16px",
+            margin: "0 auto 12px",
             color: "#000000"
           }}>
             <ShieldCheck size={32} />
           </div>
-          <h1 style={{ color: "#000000", fontSize: "28px", fontWeight: 800, margin: 0 }}>Welcome Back</h1>
+          <h1 style={{ color: "#000000", fontSize: "26px", fontWeight: 800, margin: 0 }}>Welcome Back</h1>
           <p style={{ color: "#4B5563", fontSize: "15px", marginTop: "8px" }}>Sign in to access your smart prompts</p>
         </div>
 
@@ -176,7 +157,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div style={{ position: "relative" }}>
             <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "#9CA3AF" }}>
               <Mail size={18} />
@@ -189,7 +170,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               style={{
                 width: "100%",
-                padding: "14px 16px 14px 48px",
+                padding: "12px 16px 12px 48px",
                 borderRadius: "14px",
                 border: "2px solid #E5E7EB",
                 fontSize: "15px",
@@ -215,7 +196,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: "100%",
-                padding: "14px 48px 14px 48px",
+                padding: "12px 48px 12px 48px",
                 borderRadius: "14px",
                 border: "2px solid #E5E7EB",
                 fontSize: "15px",
@@ -257,7 +238,7 @@ export default function LoginPage() {
               color: "#000000",
               border: "none",
               borderRadius: "14px",
-              padding: "16px",
+              padding: "14px",
               fontSize: "16px",
               fontWeight: 700,
               cursor: loading ? "not-allowed" : "pointer",
@@ -276,7 +257,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div style={{ margin: "24px 0", display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ margin: "16px 0", display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
           <span style={{ color: "#9CA3AF", fontSize: "12px", fontWeight: 600 }}>OR</span>
           <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
@@ -288,17 +269,17 @@ export default function LoginPage() {
             onError={() => setError("Google Login Failed")}
             theme="outline"
             shape="pill"
-            width="350"
           />
         </div>
 
-        <p style={{ textAlign: "center", marginTop: "24px", color: "#4B5563", fontSize: "14px" }}>
+        <p style={{ textAlign: "center", marginTop: "16px", color: "#4B5563", fontSize: "14px" }}>
           Don&apos;t have an account?{" "}
           <Link href="/signup" style={{ color: "#D4AF37", fontWeight: 700, textDecoration: "none" }}>
             Sign Up
           </Link>
         </p>
       </motion.div>
+      <div style={{ flex: 1, minHeight: "0px" }}></div>
 
       {/* API Key Modal */}
       {showApiKeyModal && (
@@ -309,23 +290,15 @@ export default function LoginPage() {
           backdropFilter: "blur(4px)",
           zIndex: 1000,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "20px"
+          flexDirection: "column",
+          padding: "16px",
+          boxSizing: "border-box"
         }}>
-          <motion.div
+        <div style={{ flex: 1, minHeight: "20px" }}></div>
+        <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            style={{
-              background: "#ffffff",
-              border: "1px solid rgba(212, 175, 55, 0.3)",
-              borderRadius: "32px",
-              padding: "48px 40px",
-              width: "100%",
-              maxWidth: "450px",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
-              textAlign: "center"
-            }}
+            className="shrink-0 mx-auto bg-white border border-[#D4AF37]/30 rounded-[32px] p-6 md:p-12 md:px-10 w-full max-w-[450px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] text-center relative max-h-[90vh] overflow-y-auto"
           >
             <h2 style={{ color: "#000000", fontSize: "32px", fontWeight: 900, margin: "0 0 20px 0", letterSpacing: "-0.02em" }}>
               API Key Setup
@@ -547,7 +520,11 @@ export default function LoginPage() {
                 Use Free API Key
               </button>
             </div>
+
+            {/* Spacer to prevent scroll clipping on bottom padding */}
+            <div className="h-4 w-full"></div>
           </motion.div>
+          <div style={{ flex: 1, minHeight: "20px" }}></div>
         </div>
       )}
 

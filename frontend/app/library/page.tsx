@@ -165,73 +165,32 @@ useEffect(() => {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <nav style={{
-            background: "#ffffff",
-            borderBottom: "1px solid #D4AF37",
-            padding: "16px 24px",
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-          }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
+            <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
+              <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
                 <Link 
                   href="/generator"
-                  style={{
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  background: "#000000",
-                  borderRadius: "10px",
-                  textDecoration: "none"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
                   Generator
                 </Link>
                 <Link 
                   href="/history"
-                  style={{
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  background: "#000000",
-                  borderRadius: "10px",
-                  textDecoration: "none"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
                   History
                 </Link>
                 <Link 
                   href="/community"
-                  style={{
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#ffffff",
-                  background: "#000000",
-                  borderRadius: "10px",
-                  textDecoration: "none"
-                  }}
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
                   Community
                 </Link>
-                <div style={{ position: "relative" }}>
+              </div>
+              <div className="relative shrink-0 ml-1">
                   <button
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "8px",
-                      background: "rgba(212, 175, 55, 0.1)",
-                      border: "1px solid #D4AF37",
-                      borderRadius: "50%",
-                      cursor: "pointer",
-                      color: "#AA8A27"
-                    }}
+                    className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
                   >
                     <User size={18} />
                   </button>
@@ -293,7 +252,6 @@ useEffect(() => {
                       </button>
                     </div>
                   )}
-                </div>
               </div>
             </div>
           </nav>
@@ -315,7 +273,7 @@ useEffect(() => {
           </div>
 
           <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "50px 24px 80px" }}>
+            <div className="max-w-[1200px] mx-auto px-4 py-8 md:px-6 md:py-12 md:pb-20">
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "60px", textAlign: "center" }}>
                 <div style={{
                   width: "60px", height: "60px",
@@ -394,20 +352,23 @@ useEffect(() => {
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)";
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                      <div className="flex flex-row items-start justify-between gap-2 w-full">
                         <span style={{
                           background: "rgba(212, 175, 55, 0.15)",
                           color: "#AA8A27",
-                          padding: "4px 12px",
-                          borderRadius: "10px",
-                          fontSize: "12px",
-                          fontWeight: 700,
+                          padding: "4px 8px",
+                          borderRadius: "8px",
+                          fontSize: "10px",
+                          fontWeight: 800,
                           textTransform: "uppercase",
-                          letterSpacing: "0.5px"
+                          letterSpacing: "0.5px",
+                          lineHeight: 1.2,
+                          display: "inline-block",
+                          wordBreak: "break-word"
                         }}>
                           {p.category}
                         </span>
-                        <div style={{ display: "flex", gap: "8px" }}>
+                        <div className="flex flex-row items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => {
                               setPublishModalPrompt(p);
@@ -417,33 +378,33 @@ useEffect(() => {
                             style={{
                               background: publishedIds[p.id] ? "#10b981" : "#3b82f6",
                               border: "none",
-                              borderRadius: "10px",
-                              padding: "6px 12px",
+                              borderRadius: "8px",
+                              padding: "4px 10px",
                               color: "#fff",
-                              fontSize: "12px",
-                              fontWeight: 600,
+                              fontSize: "11px",
+                              fontWeight: 700,
                               cursor: (publishedIds[p.id] || publishingId === p.id) ? "default" : "pointer",
                               transition: "all 0.2s ease",
                               opacity: publishingId === p.id ? 0.7 : 1
                             }}
                           >
-                            {publishingId === p.id ? "Publishing..." : publishedIds[p.id] ? "Published" : "Public"}
+                            {publishingId === p.id ? "Publishing..." : publishedIds[p.id] ? "Published" : "Publish"}
                           </button>
                           <button
                             onClick={() => handleCopy(p.prompt_text, p.id)}
                             style={{
                               background: copiedId === p.id ? "#10b981" : "#000000",
                               border: "none",
-                              borderRadius: "10px",
-                              padding: "6px 12px",
+                              borderRadius: "8px",
+                              padding: "4px 10px",
                               color: "#fff",
-                              fontSize: "12px",
-                              fontWeight: 600,
+                              fontSize: "11px",
+                              fontWeight: 700,
                               cursor: "pointer",
                               transition: "all 0.2s ease",
                             }}
                           >
-                            {copiedId === p.id ? "Copied!" : "Copy Prompt"}
+                            {copiedId === p.id ? "Copied!" : "Copy"}
                           </button>
                         </div>
                       </div>
@@ -497,8 +458,10 @@ useEffect(() => {
           <style>{`
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
             * { box-sizing: border-box; }
-            ::-webkit-scrollbar { width: 8px; }
+            ::-webkit-scrollbar { width: 8px; height: 0px; }
             ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+            .scrollbar-hide::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+            .scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
             body { background: #F3F3F3 !important; overflow-x: hidden; }
 
             .bg-wave-container {
@@ -513,12 +476,12 @@ useEffect(() => {
             }
 
             .waves {
-              position: absolute;
-              bottom: 0;
-              width: 100%;
-              height: 100vh;
-              min-height: 100vh;
-            }
+          position: absolute;
+          bottom: 0;
+          width: 100%;
+          height: 100vh;
+          min-height: 100vh;
+        }
 
             .parallax > use {
               animation: move-forever 25s cubic-bezier(.55,.5,.45,.5)     infinite;
@@ -565,22 +528,14 @@ useEffect(() => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: "20px"
+                padding: "16px",
+                boxSizing: "border-box"
               }}>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                  style={{
-                    background: "#ffffff",
-                    border: "1px solid rgba(212, 175, 55, 0.3)",
-                    borderRadius: "24px",
-                    padding: "32px",
-                    width: "100%",
-                    maxWidth: "450px",
-                    boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-                    position: "relative"
-                  }}
+                  className="bg-white border border-[#D4AF37]/30 rounded-[24px] p-6 md:p-8 w-full max-w-[450px] shadow-[0_20px_40px_rgba(0,0,0,0.1)] relative"
                 >
                   <button
                     onClick={() => setIsSettingsOpen(false)}
@@ -683,7 +638,7 @@ useEffect(() => {
                         <option value="" disabled hidden>
                           {!settingsApiProvider ? "Select a provider first" : "Enter the Model"}
                         </option>
-                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider] && PROVIDER_MODELS[settingsApiProvider].map(m => (
+                        {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider]?.map(m => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                       </select>
@@ -827,7 +782,7 @@ useEffect(() => {
               <div style={{
                 position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
                 background: "rgba(0, 0, 0, 0.4)", backdropFilter: "blur(4px)",
-                zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px"
+                zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", boxSizing: "border-box"
               }}>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -835,10 +790,11 @@ useEffect(() => {
                   exit={{ opacity: 0, scale: 0.95, y: 20 }}
                   style={{
                     background: "#ffffff", border: "1px solid rgba(212, 175, 55, 0.3)",
-                    borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "400px",
+                    borderRadius: "24px", width: "100%", maxWidth: "400px",
                     boxShadow: "0 20px 40px rgba(0,0,0,0.1)", position: "relative",
                     display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center"
                   }}
+                  className="p-6 md:p-8"
                 >
                   <button
                     onClick={() => {
@@ -886,7 +842,7 @@ useEffect(() => {
                         }}>Cancel</button>
                         <button onClick={handlePublish} disabled={publishingId !== null} style={{
                           flex: 1, background: "#3b82f6", border: "none", borderRadius: "12px", padding: "12px", color: "#ffffff", fontSize: "14px", fontWeight: 600, cursor: publishingId !== null ? "default" : "pointer", opacity: publishingId !== null ? 0.7 : 1
-                        }}>{publishingId !== null ? "Publishing..." : "Make Public"}</button>
+                        }}>{publishingId !== null ? "Publishing..." : "Make Publish"}</button>
                       </>
                     )}
                   </div>

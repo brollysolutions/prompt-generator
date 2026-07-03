@@ -7,6 +7,16 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
+const PROVIDER_MODELS: Record<string, string[]> = {
+  "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
+  "Claude": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+  "OpenAI(chat gpt)": ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
+  "Google Gemini": ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"],
+  "Cohere Dashboard": ["command-r-plus", "command-r"],
+  "Perplexity API": ["llama-3-sonar-large-32k-online", "llama-3-sonar-small-32k-online"],
+  "Hugging Face Inference Provider": ["meta-llama/Meta-Llama-3-8B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
+};
+
 type CommunityPrompt = {
   id: number;
   name: string;
@@ -26,6 +36,41 @@ export default function CommunityPage() {
   // Navigation / Profile states
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsApiKey, setSettingsApiKey] = useState("");
+  const [settingsApiProvider, setSettingsApiProvider] = useState("");
+  const [settingsApiModel, setSettingsApiModel] = useState("");
+  const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+      setIsEditingSettingsKey(false);
+    }
+  }, [isSettingsOpen]);
+
+  const handleSaveSettingsKey = () => {
+    const trimmedKey = settingsApiKey.trim();
+    if (trimmedKey && trimmedKey !== "free") {
+      if (!settingsApiProvider) {
+        alert("Please select an API provider.");
+        return;
+      }
+      if (!settingsApiModel) {
+        alert("Please select a model.");
+        return;
+      }
+      localStorage.setItem("user_api_key", trimmedKey);
+      localStorage.setItem("user_api_provider", settingsApiProvider);
+      localStorage.setItem("user_api_model", settingsApiModel);
+    } else {
+      localStorage.setItem("user_api_key", "free");
+      localStorage.setItem("user_api_provider", "free");
+      localStorage.setItem("user_api_model", "free");
+    }
+    setIsEditingSettingsKey(false);
+  };
   
   // Community Data states
   const [prompts, setPrompts] = useState<CommunityPrompt[]>([]);
@@ -166,38 +211,26 @@ export default function CommunityPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <nav style={{
-            background: "#ffffff",
-            borderBottom: "1px solid #D4AF37",
-            padding: "16px 24px",
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-          }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <Link href="/generator" style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, color: "#ffffff", background: "#000000", borderRadius: "10px", textDecoration: "none" }}>
+          <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
+            <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
+              <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
+                <Link href="/generator" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
                   Generator
                 </Link>
-                <Link href="/library" style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, color: "#ffffff", background: "#000000", borderRadius: "10px", textDecoration: "none" }}>
+                <Link href="/library" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
                   Library
                 </Link>
-                <Link href="/history" style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, color: "#ffffff", background: "#000000", borderRadius: "10px", textDecoration: "none" }}>
+                <Link href="/history" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
                   History
                 </Link>
-                <Link href="/community" style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, color: "#ffffff", background: "#333333", borderRadius: "10px", textDecoration: "none", boxShadow: "inset 0 0 0 1px #D4AF37" }}>
+                <Link href="/community" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0 shadow-[inset_0_0_0_1px_#D4AF37]">
                   Community
                 </Link>
-                <div style={{ position: "relative" }}>
+              </div>
+              <div className="relative shrink-0 ml-1">
                   <button
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "8px", background: "rgba(212, 175, 55, 0.1)",
-                      border: "1px solid #D4AF37", borderRadius: "50%",
-                      cursor: "pointer", color: "#AA8A27"
-                    }}
+                    className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
                   >
                     <User size={18} />
                   </button>
@@ -208,12 +241,14 @@ export default function CommunityPage() {
                       boxShadow: "0 4px 12px rgba(0,0,0,0.1)", display: "flex",
                       flexDirection: "column", overflow: "hidden", minWidth: "120px", zIndex: 101
                     }}>
+                      <button onClick={() => { setIsProfileOpen(false); setIsSettingsOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "#333", textAlign: "left", borderBottom: "1px solid #eaeaea" }}>
+                        <Settings size={16} /> Settings
+                      </button>
                       <button onClick={logout} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "#e11d48", textAlign: "left" }}>
                         <LogOut size={16} /> Logout
                       </button>
                     </div>
                   )}
-                </div>
               </div>
             </div>
           </nav>
@@ -232,7 +267,7 @@ export default function CommunityPage() {
           </div>
 
           <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "50px 24px 80px" }}>
+            <div className="max-w-[1200px] mx-auto px-4 py-8 md:px-6 md:py-12 md:pb-20">
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "40px", textAlign: "center" }}>
                 <div style={{
                   width: "60px", height: "60px", background: "#D4AF37", borderRadius: "18px",
@@ -246,9 +281,9 @@ export default function CommunityPage() {
                 </p>
                 
                 {/* Controls Row */}
-                <div style={{ display: "flex", gap: "12px", width: "100%", maxWidth: "800px", flexWrap: "wrap", justifyContent: "center" }}>
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[800px] justify-center items-stretch">
                   {/* Search Bar */}
-                  <div style={{ position: "relative", flex: "1 1 300px" }}>
+                  <div className="relative w-full sm:flex-[2]">
                     <input
                       type="text"
                       placeholder="Search prompts..."
@@ -263,32 +298,38 @@ export default function CommunityPage() {
                     <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", fontSize: "18px", opacity: 0.5 }}>🔍</div>
                   </div>
 
-                  {/* Category Dropdown */}
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    style={{
-                      padding: "14px 20px", background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
-                      border: "2px solid #E5E7EB", borderRadius: "14px", color: "#000000", fontSize: "15px", outline: "none",
-                      cursor: "pointer", fontWeight: 600
-                    }}
-                  >
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
+                    {/* Category Dropdown */}
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="w-full sm:flex-[1]"
+                      style={{
+                        padding: "14px 20px", background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
+                        border: "2px solid #E5E7EB", borderRadius: "14px", color: "#000000", fontSize: "16px", outline: "none",
+                        cursor: "pointer", fontWeight: 500, fontFamily: "inherit", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap"
+                      }}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
 
-                  {/* Sort Dropdown */}
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    style={{
-                      padding: "14px 20px", background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
-                      border: "2px solid #E5E7EB", borderRadius: "14px", color: "#000000", fontSize: "15px", outline: "none",
-                      cursor: "pointer", fontWeight: 600
-                    }}
-                  >
-                    <option value="trending">🔥 Trending</option>
-                    <option value="newest">✨ Newest</option>
-                  </select>
+                    {/* Sort Dropdown */}
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="w-full sm:flex-[1]"
+                      style={{
+                        padding: "14px 20px", background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
+                        border: "2px solid #E5E7EB", borderRadius: "14px", color: "#000000", fontSize: "16px", outline: "none",
+                        cursor: "pointer", fontWeight: 500, fontFamily: "inherit", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap"
+                      }}
+                    >
+                      <option value="trending">🔥 Trending</option>
+                      <option value="newest">✨ Newest</option>
+                    </select>
                 </div>
               </div>
 
@@ -312,16 +353,21 @@ export default function CommunityPage() {
                       onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                         
                         {/* Header Row */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", color: "#4B5563" }}>
+                        <div className="flex flex-row items-start justify-between gap-2 w-full">
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 1, minWidth: 0 }}>
+                            <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", color: "#4B5563", flexShrink: 0 }}>
                               {p.author_email.charAt(0).toUpperCase()}
                             </div>
-                            <span style={{ fontSize: "13px", fontWeight: 600, color: "#4B5563", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#4B5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {p.author_email.split('@')[0]}
                             </span>
                           </div>
-                          <span style={{ background: "rgba(212, 175, 55, 0.15)", color: "#AA8A27", padding: "4px 10px", borderRadius: "10px", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>
+                          <span style={{ 
+                            background: "rgba(212, 175, 55, 0.15)", color: "#AA8A27", 
+                            padding: "4px 8px", borderRadius: "8px", fontSize: "10px", 
+                            fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px",
+                            lineHeight: 1.2, display: "inline-block", wordBreak: "break-word", flexShrink: 0 
+                          }}>
                             {p.category}
                           </span>
                         </div>
@@ -347,7 +393,7 @@ export default function CommunityPage() {
                         </div>
 
                         {/* Actions Row */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", borderTop: "1px solid rgba(0,0,0,0.05)", paddingTop: "16px" }}>
+                        <div className="flex flex-wrap items-center justify-between mt-auto border-t border-black/5 pt-4 gap-3">
                           
                           <button onClick={() => handleUpvote(p.id)} style={{
                             display: "flex", alignItems: "center", gap: "6px", background: p.has_upvoted ? "#F4CE14" : "rgba(0,0,0,0.05)",
@@ -375,15 +421,144 @@ export default function CommunityPage() {
             </div>
           </div>
 
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0, 0, 0, 0.4)", backdropFilter: "blur(4px)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", boxSizing: "border-box"
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white border border-[#D4AF37]/30 rounded-[24px] p-6 md:p-8 w-full max-w-[450px] shadow-[0_20px_40px_rgba(0,0,0,0.1)] relative"
+            >
+              <button onClick={() => setIsSettingsOpen(false)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}>
+                <X size={20} />
+              </button>
+
+              <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                <div style={{ width: "48px", height: "48px", background: "rgba(212, 175, 55, 0.1)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "#AA8A27" }}>
+                  <Key size={24} />
+                </div>
+                <h2 style={{ color: "#000000", fontSize: "24px", fontWeight: 800, margin: 0 }}>Settings</h2>
+                <p style={{ color: "#6B7280", fontSize: "14px", marginTop: "4px" }}>Manage your account preferences</p>
+              </div>
+
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ display: "block", color: "#374151", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>API Configuration</label>
+                <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {isEditingSettingsKey ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <div style={{ position: "relative" }}>
+                        <select value={settingsApiProvider} onChange={(e) => { setSettingsApiProvider(e.target.value); setSettingsApiModel(""); }} style={{ width: "100%", padding: "10px 32px 10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", appearance: "none", background: "#ffffff", color: settingsApiProvider === "" ? "#9CA3AF" : "#000000" }}>
+                          <option value="" disabled hidden>Enter the API Name</option>
+                          {Object.keys(PROVIDER_MODELS).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <ChevronDown size={16} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#9CA3AF" }} />
+                      </div>
+                      <div style={{ position: "relative" }}>
+                        <select value={settingsApiModel} onChange={(e) => setSettingsApiModel(e.target.value)} disabled={!settingsApiProvider} style={{ width: "100%", padding: "10px 32px 10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", appearance: "none", background: !settingsApiProvider ? "#F3F4F6" : "#ffffff", color: settingsApiModel === "" ? "#9CA3AF" : "#000000" }}>
+                          <option value="" disabled hidden>{!settingsApiProvider ? "Select a provider first" : "Enter the Model"}</option>
+                          {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider]?.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <ChevronDown size={16} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#9CA3AF" }} />
+                      </div>
+                      <input type="text" value={settingsApiKey} onChange={(e) => setSettingsApiKey(e.target.value)} placeholder="Enter API Key (or leave empty for 'free')" style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", boxSizing: "border-box", color: "#000" }} />
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button onClick={handleSaveSettingsKey} style={{ flex: 1, background: "#000000", color: "#ffffff", border: "none", borderRadius: "8px", padding: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}><Save size={14} /> Save</button>
+                        <button onClick={() => setIsEditingSettingsKey(false)} style={{ flex: 1, background: "#f3f4f6", color: "#4b5563", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "#6B7280", textTransform: "uppercase", fontWeight: 700 }}>Provider</div>
+                          <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
+                            {localStorage.getItem("user_api_provider") === "free" ? "Free Shared" : localStorage.getItem("user_api_provider") || "Not Set"}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setIsEditingSettingsKey(true)}
+                          style={{
+                            background: "rgba(212, 175, 55, 0.1)",
+                            color: "#AA8A27",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "8px 12px",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <Edit2 size={14} /> Edit
+                        </button>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#6B7280", textTransform: "uppercase", fontWeight: 700 }}>Model</div>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
+                          {localStorage.getItem("user_api_model") === "free" ? "Free Shared" : localStorage.getItem("user_api_model") || "Not Set"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#6B7280", textTransform: "uppercase", fontWeight: 700 }}>API Key</div>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827", fontFamily: "monospace" }}>
+                          {localStorage.getItem("user_api_key") === "free" ? "Free Shared Key" : localStorage.getItem("user_api_key") ? "••••••••" + (localStorage.getItem("user_api_key") || "").slice(-4) : "Not Set"}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                style={{
+                  width: "100%",
+                  background: "#F3F4F6",
+                  color: "#4B5563",
+                  border: "none",
+                  borderRadius: "12px",
+                  padding: "12px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#E5E7EB"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "#F3F4F6"}
+              >
+                Close
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
           <style>{`
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
             * { box-sizing: border-box; }
-            ::-webkit-scrollbar { width: 8px; }
+            ::-webkit-scrollbar { width: 8px; height: 0px; }
             ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+            .scrollbar-hide::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+            .scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
             body { background: #F3F3F3 !important; overflow-x: hidden; }
 
             .bg-wave-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: #F3F3F3; overflow: hidden; }
-            .waves { position: absolute; bottom: 0; width: 100%; height: 100vh; min-height: 100vh; }
+            .waves {
+          position: absolute;
+          bottom: 0;
+          width: 100%;
+          height: 100vh;
+          min-height: 100vh;
+        }
             .parallax > use { animation: move-forever 25s cubic-bezier(.55,.5,.45,.5) infinite; }
             .parallax > use:nth-child(1) { animation-delay: -2s; animation-duration: 7s; fill: rgba(255, 201, 0, 0.4); }
             .parallax > use:nth-child(2) { animation-delay: -3s; animation-duration: 10s; fill: rgba(255, 225, 0, 0.3); }
