@@ -13,24 +13,51 @@ load_dotenv(override=True)
 
 import random
 
+class GroqWrapper:
+    def __init__(self):
+        self.keys = []
+        for i in range(1, 20):
+            key = os.getenv(f"GROQ_API_KEY_{i}")
+            if key: self.keys.append(key)
+        if not self.keys:
+            key = os.getenv("GROQ_API_KEY")
+            if key: self.keys.append(key)
+        if not self.keys:
+            raise ValueError("No GROQ_API_KEY found in .env")
+
+    class Chat:
+        def __init__(self, parent):
+            self.parent = parent
+            self.completions = self.Completions(parent)
+
+        class Completions:
+            def __init__(self, parent):
+                self.parent = parent
+
+            async def create(self, **kwargs):
+                import random
+                keys = list(self.parent.keys)
+                random.shuffle(keys)
+                last_err = None
+                for key in keys:
+                    try:
+                        from groq import AsyncGroq
+                        client = AsyncGroq(api_key=key)
+                        print(f"\n[DEBUG] 🚀 Attempting with Groq API Key ending in: ...{key[-4:]}")
+                        return await client.chat.completions.create(**kwargs)
+                    except Exception as e:
+                        last_err = e
+                        print(f"[DEBUG] ⚠️ Key ...{key[-4:]} failed (Rate Limit?). Retrying next key... Error: {str(e)[:60]}")
+                        continue
+                print("[ERROR] ❌ ALL 7 GROQ KEYS EXHAUSTED!")
+                raise last_err
+
+    @property
+    def chat(self):
+        return self.Chat(self)
+
 def get_client():
-    keys = []
-    for i in range(1, 20):
-        key = os.getenv(f"GROQ_API_KEY_{i}")
-        if key:
-            keys.append(key)
-    
-    if not keys:
-        key = os.getenv("GROQ_API_KEY")
-        if key:
-            keys.append(key)
-            
-    if not keys:
-        raise ValueError("No GROQ_API_KEY found in .env")
-        
-    chosen_key = random.choice(keys)
-    print(f"\n[DEBUG] 🚀 Using Groq API Key ending in: ...{chosen_key[-4:]}\n")
-    return AsyncGroq(api_key=chosen_key)
+    return GroqWrapper()
 
 # Helper to strip markdown JSON blocks and conversational text
 def clean_json_content(content: str) -> str:
@@ -71,12 +98,24 @@ def clean_json_content(content: str) -> str:
 
 async def generate_questions(user_input):
 
+    language_instruction = """
+### LANGUAGE PROTOCOL ###
+You MUST output the questions and options in the EXACT SAME LANGUAGE as the user's input.
+- If user writes in English -> Output MUST be 100% English.
+- If user writes in Teluglish (Telugu in English letters) -> Output MUST be Teluglish (English letters only).
+- If user writes in Hinglish (Hindi in English letters) -> Output MUST be Hinglish (English letters only).
+
+NEVER use native Telugu script or Devanagari script under any circumstances. Always use English characters (A-Z).
+"""
+
     prompt = f"""You are an expert AI Requirements Analyst and Domain Expert.
 
 The user wants to create an AI prompt for the following idea:
 "{user_input}"
 
-Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to REFINE and FINALIZE this prompt into a world-class, production-ready execution tool. 
+Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to REFINE and FINALIZE this prompt into a world-class, production-ready execution tool.
+
+{language_instruction} 
 
 Think deeply about what variables make the biggest difference in quality for this specific request. 
 
@@ -89,16 +128,16 @@ CRITICAL RULES:
    - Preferred learning style (e.g., hands-on/coding-first, theoretical/reading, video-based).
 4. Use clear, user-friendly language. Make the questions easy to answer.
 5. ALL questions MUST use the "checkbox" type. This allows the user to select multiple relevant options.
-6. For every question, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. Do not make the user think too hard—give them the best default options.
+6. For every question, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. CRITICAL: These options MUST be written in the EXACT SAME LANGUAGE and script (e.g., Teluglish, Hinglish) as the question! Do not default to English options if the user input is not English.
 7. NOTE: A "Custom Message" option is automatically added to all checkbox questions by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
 
 Return ONLY a JSON object matching this exact schema:
 {{
   "questions": [
     {{
-      "question": "A highly specific question related to the user's idea",
+      "question": "A highly specific question related to the user's idea (in the detected language)",
       "type": "checkbox",
-      "options": ["Specific Option 1", "Specific Option 2", "Specific Option 3"]
+      "options": ["Option 1 (in detected language)", "Option 2 (in detected language)", "Option 3 (in detected language)"]
     }},
     {{
       "question": "Another specific detail needed",
@@ -110,7 +149,7 @@ Return ONLY a JSON object matching this exact schema:
 
     try:
         response = await get_client().chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
             max_tokens=1500,
@@ -170,6 +209,18 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
         caveman_instruction = "OFF"
         if caveman_mode:
             caveman_instruction = "ON (Token Compression active: strip linguistic filler, use primitive but high-reasoning language)."
+            
+        language_instruction = """
+### LANGUAGE PROTOCOL ###
+You MUST output the prompt in the EXACT SAME LANGUAGE as the user's input and answers.
+- If user writes in English -> Output MUST be 100% English.
+- If user writes in Teluglish (Telugu in English letters) -> Output MUST be meaningful, conversational Teluglish.
+  Example of good Teluglish: "Mee app target audience evaru?", "Idi enduku use chestaru?"
+- If user writes in Hinglish (Hindi in English letters) -> Output MUST be meaningful, conversational Hinglish.
+  Example of good Hinglish: "Aapka target audience kaun hai?", "Yeh app kiske liye banaya gaya hai?"
+
+NEVER use native Telugu script or Devanagari script under any circumstances. Always use English characters (A-Z).
+"""
 
         prompt = f"""You are the World's Greatest Expert AI Prompt Engineer. Your mission is to take a raw user idea and their specific responses to clarifying questions to craft a master execution prompt that is highly relevant, clear, and context-aware.
 
@@ -183,7 +234,8 @@ Before writing the prompt, perform a deep-dive analysis of the input idea and re
 1. **Strategic Audit:** Identify key aspects, objectives, and specific use cases.
 2. **Challenge Detection:** Pinpoint potential challenges, constraints, and "invisible variables" that could lead to ambiguity.
 3. **Model Optimization:** {optimization_instruction}
-4. **Language:** {caveman_instruction}
+4. **Language Structure:** {caveman_instruction}
+5. **Target Language:** {language_instruction}
 
 ---
 ## TASK
@@ -414,11 +466,20 @@ Furthermore, engage in deep thinking and reasoning. Simulate the advanced reason
 
 async def test_generated_prompt(prompt: str) -> str:
     """Sends the generated prompt to the LLM and returns its response."""
+    language_instruction = """
+### LANGUAGE PROTOCOL ###
+You MUST output the response in the EXACT SAME LANGUAGE as the prompt.
+- If prompt is in English -> Output MUST be 100% English.
+- If prompt is in Teluglish (Telugu in English letters) -> Output MUST be Teluglish (English letters only).
+- If prompt is in Hinglish (Hindi in English letters) -> Output MUST be Hinglish (English letters only).
+
+NEVER use native Telugu script or Devanagari script under any circumstances. Always use English characters (A-Z).
+"""
     try:
         response = await get_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": TEST_PROMPT_SYSTEM_INSTRUCTION},
+                {"role": "system", "content": TEST_PROMPT_SYSTEM_INSTRUCTION + "\n\n" + language_instruction},
                 {"role": "user", "content": f"Execute the following prompt:\n\n{prompt}"}
             ],
             temperature=0.6,

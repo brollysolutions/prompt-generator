@@ -11,22 +11,51 @@ load_dotenv(override=True)
 
 import random
 
+class GeminiWrapper:
+    def __init__(self):
+        self.keys = []
+        for i in range(1, 15):
+            key = os.getenv(f"GEMINI_API_KEY_{i}")
+            if key: self.keys.append(key)
+        if not self.keys:
+            single_key = os.getenv("GEMINI_API_KEY")
+            if single_key: self.keys.append(single_key)
+        if not self.keys:
+            raise ValueError("No GEMINI_API_KEY found in .env")
+
+    class Aio:
+        def __init__(self, parent):
+            self.parent = parent
+            self.models = self.Models(parent)
+            
+        class Models:
+            def __init__(self, parent):
+                self.parent = parent
+                
+            async def generate_content(self, **kwargs):
+                import random
+                keys = list(self.parent.keys)
+                random.shuffle(keys)
+                last_err = None
+                for key in keys:
+                    try:
+                        from google import genai
+                        client = genai.Client(api_key=key)
+                        print(f"\n[DEBUG] 🚀 Attempting with Gemini API Key ending in: ...{key[-4:]}")
+                        return await client.aio.models.generate_content(**kwargs)
+                    except Exception as e:
+                        last_err = e
+                        print(f"[DEBUG] ⚠️ Key ...{key[-4:]} failed. Retrying next key... Error: {str(e)[:60]}")
+                        continue
+                print("[ERROR] ❌ ALL GEMINI KEYS EXHAUSTED!")
+                raise last_err
+                
+    @property
+    def aio(self):
+        return self.Aio(self)
+
 def get_client():
-    keys = []
-    for i in range(1, 15):
-        key = os.getenv(f"GEMINI_API_KEY_{i}")
-        if key:
-            keys.append(key)
-    
-    if not keys:
-        single_key = os.getenv("GEMINI_API_KEY")
-        if single_key:
-            return genai.Client(api_key=single_key)
-        raise ValueError("No GEMINI_API_KEY found in .env")
-        
-    chosen_key = random.choice(keys)
-    print(f"\n[DEBUG] 🚀 Using Gemini API Key ending in: ...{chosen_key[-4:]}\n")
-    return genai.Client(api_key=chosen_key)
+    return GeminiWrapper()
 
 model_name = "gemini-2.5-flash"
 
@@ -41,10 +70,20 @@ def clean_json_content(content: str) -> str:
     return content.strip()
 
 async def generate_questions(user_input):
+    language_instruction = """
+### LANGUAGE MATCHING PROTOCOL ###
+You MUST analyze the user's input and reply in the EXACT SAME language and script.
+- If the input is in English, generate all questions and options purely in English.
+- If the input is in Teluglish (Telugu words using English letters), generate all questions and options purely in Teluglish. CRITICAL: Use natural, conversational, everyday Telugu that friends use to chat (e.g., "Mee level enti?", "Evaru target audience?"). DO NOT use formal/bookish Telugu. DO NOT robotically repeat the user's prompt. Do NOT use Telugu script.
+- If the input is in Hinglish (Hindi words using English letters), generate all questions and options purely in Hinglish. CRITICAL: Use natural, conversational, everyday Hindi (e.g., "Aapka level kya hai?"). DO NOT use formal/bookish Hindi. DO NOT robotically repeat the user's prompt. Do NOT use Devanagari script.
+"""
     prompt = f"""You are an expert AI Requirements Analyst and Domain Expert.
+
+{language_instruction}
+
 The user wants to create an AI prompt for the following idea:
 "{user_input}"
-Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to REFINE and FINALIZE this prompt into a world-class, production-ready execution tool. 
+Your task is to generate 5-7 highly specific, context-aware follow-up questions to gather the EXACT details needed to REFINE and FINALIZE this prompt into a world-class, production-ready execution tool.
 CRITICAL RULES:
 1. DO NOT ask generic questions (e.g., "What is the primary goal?", "Who is the target audience?") UNLESS they are uniquely tailored to the specific domain.
 2. Ensure the questions directly capture the core variables needed to execute the task perfectly.
@@ -54,16 +93,16 @@ CRITICAL RULES:
    - Preferred learning style (e.g., hands-on/coding-first, theoretical/reading, video-based).
 4. Use clear, user-friendly language. Make the questions easy to answer.
 5. ALL questions MUST use the "checkbox" type. This allows the user to select multiple relevant options.
-6. For every question, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. Do not make the user think too hard—give them the best default options.
+6. For every question, you MUST include a logical "options" array with 3-8 highly relevant and specific choices. CRITICAL: These options MUST be written in the EXACT SAME LANGUAGE and script (e.g., Teluglish, Hinglish) as the question! Do not default to English options if the user input is not English.
 7. NOTE: A "Custom Message" option is automatically added to all checkbox questions by the UI. DO NOT include "Other", "Custom", or "None of the above" in your options array as it would be redundant.
 
 Return ONLY a JSON object matching this exact schema:
 {{
   "questions": [
     {{
-      "question": "A highly specific question related to the user's idea",
+      "question": "A highly specific question related to the user's idea (in the detected language)",
       "type": "checkbox",
-      "options": ["Specific Option 1", "Specific Option 2", "Specific Option 3"]
+      "options": ["Option 1 (in detected language)", "Option 2 (in detected language)", "Option 3 (in detected language)"]
     }}
   ]
 }}"""
@@ -102,6 +141,13 @@ async def generate_final_prompt(user_input: str, answers: dict, questions: list 
             qa_context += f"Q: Question {int(k)+1}\nA: {ans}\n\n"
 
     target_ai_text = f"Target AI Model: {target_ai}" if target_ai else "Target AI Model: Universal (Any LLM)"
+    language_instruction = """
+### LANGUAGE MATCHING PROTOCOL ###
+You MUST analyze the user's input and Q&A answers, and reply in the EXACT SAME language and script.
+- If the input/answers are in English, generate the prompt purely in English.
+- If the input/answers are in Teluglish (Telugu words using English letters), generate the entire prompt purely in Teluglish. Do NOT use Telugu script. Do NOT provide English translations.
+- If the input/answers are in Hinglish (Hindi words using English letters), generate the entire prompt purely in Hinglish. Do NOT use Devanagari script. Do NOT provide English translations.
+"""
 
     prompt = f"""You are a master AI Prompt Engineer. Your task is to synthesize the user's initial idea and their specific Q&A answers into a SINGLE, world-class execution prompt.
 # User Request:
@@ -110,6 +156,8 @@ Original Idea: {user_input}
 {qa_context}
 # Target AI:
 {target_ai_text}
+# Language:
+{language_instruction}
 CRITICAL INSTRUCTIONS:
 1. The `smart_prompt` must be written FROM the perspective of the User TO the AI. When the user copies `smart_prompt` and pastes it into ChatGPT/Claude, it should execute their task perfectly.
 2. DO NOT write "Here is your prompt" inside `smart_prompt`. 
@@ -252,7 +300,14 @@ async def enhance_prompt_text(original_prompt: str, instruction: str) -> str:
 
 async def test_generated_prompt(prompt: str) -> str:
     try:
-        sys_prompt = "You are the target AI receiving this prompt. Fulfill it as best as possible to demonstrate how it works."
+        language_instruction = """
+### LANGUAGE MATCHING PROTOCOL ###
+You MUST analyze the language of the prompt and reply in the EXACT SAME language and script.
+- If the prompt is in English, respond purely in English.
+- If the prompt is in Teluglish (Telugu words using English letters), respond purely in Teluglish. Do NOT use Telugu script.
+- If the prompt is in Hinglish (Hindi words using English letters), respond purely in Hinglish. Do NOT use Devanagari script.
+"""
+        sys_prompt = f"You are the target AI receiving this prompt. Fulfill it as best as possible to demonstrate how it works.\n\n{language_instruction}"
         full_prompt = f"{sys_prompt}\n\n{prompt}"
         response = await get_client().aio.models.generate_content(
             model=model_name,

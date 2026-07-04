@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Copy, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, ThumbsUp, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, LayoutTemplate } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import TemplateSection from "@/components/ui/TemplateSection";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -17,19 +18,7 @@ const PROVIDER_MODELS: Record<string, string[]> = {
   "Hugging Face Inference Provider": ["meta-llama/Meta-Llama-3-8B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
 };
 
-type CommunityPrompt = {
-  id: number;
-  name: string;
-  prompt_text: string;
-  tags: string[];
-  category: string;
-  author_email: string;
-  upvotes: number;
-  created_at: string;
-  has_upvoted: boolean;
-};
-
-export default function CommunityPage() {
+export default function TemplatesPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
   
@@ -72,17 +61,6 @@ export default function CommunityPage() {
     setIsEditingSettingsKey(false);
   };
   
-  // Community Data states
-  const [prompts, setPrompts] = useState<CommunityPrompt[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [sortBy, setSortBy] = useState("trending");
-  const [loading, setLoading] = useState(true);
-  
-  // Interaction states
-  const [savingIds, setSavingIds] = useState<Record<number, boolean>>({});
-  const [savedIds, setSavedIds] = useState<Record<number, boolean>>({});
-
   // Auth protection
   useEffect(() => {
     if (!authLoading && !user) {
@@ -90,113 +68,10 @@ export default function CommunityPage() {
     }
   }, [user, authLoading, router]);
 
-  const fetchCommunity = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/community?user_id=${user.id}&sort_by=${sortBy}`);
-      const data = await response.json();
-      setPrompts(data.prompts || []);
-    } catch (error) {
-      console.error("Failed to fetch community", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!authLoading && user) {
-      fetchCommunity();
-    }
-  }, [user, authLoading, sortBy]);
-
-  const handleUpvote = async (promptId: number) => {
-    if (!user) return;
-    
-    // Optimistic UI update
-    setPrompts(prev => prev.map(p => {
-      if (p.id === promptId) {
-        return {
-          ...p,
-          has_upvoted: !p.has_upvoted,
-          upvotes: p.has_upvoted ? p.upvotes - 1 : p.upvotes + 1
-        };
-      }
-      return p;
-    }));
-
-    try {
-      await fetch("http://127.0.0.1:8000/community/upvote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt_id: promptId, user_id: user.id })
-      });
-      // Optionally refetch or trust the optimistic update
-    } catch (error) {
-      console.error("Failed to upvote", error);
-      // Revert on error could be implemented here
-    }
-  };
-
-  const handleSave = async (promptId: number) => {
-    if (!user) return;
-    try {
-      setSavingIds(prev => ({ ...prev, [promptId]: true }));
-      const response = await fetch("http://127.0.0.1:8000/community/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt_id: promptId, user_id: user.id })
-      });
-      
-      if (response.ok) {
-        setSavedIds(prev => ({ ...prev, [promptId]: true }));
-      } else {
-        alert("Failed to save to library");
-      }
-    } catch (error) {
-      console.error("Failed to save prompt", error);
-    } finally {
-      setSavingIds(prev => ({ ...prev, [promptId]: false }));
-    }
-  };
-
-  const handleRemix = (promptText: string) => {
-    // Navigate to generator with the prompt text ready to be remixed
-    // The generator would need to accept a query param or read from sessionStorage
-    sessionStorage.setItem("remix_prompt", promptText);
+  const handleSelectTemplate = (templateText: string) => {
+    localStorage.setItem("userInput", templateText);
     router.push("/generator");
   };
-
-  const handleReport = async (promptId: number) => {
-    if (window.confirm("Are you sure you want to report this prompt for inappropriate content?")) {
-      try {
-        await fetch(`http://127.0.0.1:8000/community/report/${promptId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: user?.id })
-        });
-        alert("Prompt reported successfully. An admin will review it.");
-      } catch (error) {
-        console.error("Failed to report", error);
-      }
-    }
-  };
-
-  // Derive unique categories from prompts for the filter dropdown
-  const categories = ["All", ...Array.from(new Set(prompts.map(p => p.category)))];
-
-  const filteredPrompts = prompts.filter((p) => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = 
-      p.name.toLowerCase().includes(query) ||
-      p.prompt_text.toLowerCase().includes(query) ||
-      p.tags.some((t) => t.toLowerCase().includes(query)) ||
-      p.author_email.toLowerCase().includes(query);
-      
-    const matchesCategory = categoryFilter === "All" || p.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
 
   return (
     <div style={{
@@ -214,7 +89,7 @@ export default function CommunityPage() {
           <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
             <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
               <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
-                <Link href="/templates" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
+                <Link href="/templates" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0 shadow-[inset_0_0_0_1px_#D4AF37]">
                   Templates
                 </Link>
                 <Link href="/generator" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
@@ -226,7 +101,7 @@ export default function CommunityPage() {
                 <Link href="/history" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
                   History
                 </Link>
-                <Link href="/community" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0 shadow-[inset_0_0_0_1px_#D4AF37]">
+                <Link href="/community" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
                   Community
                 </Link>
               </div>
@@ -275,152 +150,20 @@ export default function CommunityPage() {
                 <div style={{
                   width: "60px", height: "60px", background: "#D4AF37", borderRadius: "18px",
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px", marginBottom: "20px"
-                }}>🌍</div>
+                }}>
+                  <LayoutTemplate size={32} color="#000000" />
+                </div>
                 <h1 style={{ color: "#000000", fontSize: "42px", fontWeight: 800, margin: 0, letterSpacing: "-1.5px" }}>
-                  Community Prompts
+                  All Templates
                 </h1>
                 <p style={{ color: "#374151", fontSize: "18px", margin: "10px 0 30px", maxWidth: "600px", fontWeight: 500 }}>
-                  Browse, save, and remix prompts shared by everyone.
+                  Browse our full collection of ready-made prompt templates.
                 </p>
-                
-                {/* Controls Row */}
-                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[800px] justify-center items-stretch">
-                  {/* Search Bar */}
-                  <div className="relative w-full sm:flex-[2]">
-                    <input
-                      type="text"
-                      placeholder="Search prompts..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{
-                        width: "100%", padding: "14px 20px 14px 48px", background: "rgba(255, 255, 255, 0.7)",
-                        backdropFilter: "blur(12px)", border: "2px solid #D4AF37", borderRadius: "14px",
-                        color: "#000000", fontSize: "15px", outline: "none"
-                      }}
-                    />
-                    <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", fontSize: "18px", opacity: 0.5 }}>🔍</div>
-                  </div>
-
-                    {/* Category Dropdown */}
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="w-full sm:flex-[1]"
-                      style={{
-                        padding: "14px 20px", background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
-                        border: "2px solid #E5E7EB", borderRadius: "14px", color: "#000000", fontSize: "16px", outline: "none",
-                        cursor: "pointer", fontWeight: 500, fontFamily: "inherit", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap"
-                      }}
-                    >
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Sort Dropdown */}
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="w-full sm:flex-[1]"
-                      style={{
-                        padding: "14px 20px", background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
-                        border: "2px solid #E5E7EB", borderRadius: "14px", color: "#000000", fontSize: "16px", outline: "none",
-                        cursor: "pointer", fontWeight: 500, fontFamily: "inherit", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap"
-                      }}
-                    >
-                      <option value="trending">🔥 Trending</option>
-                      <option value="newest">✨ Newest</option>
-                    </select>
-                </div>
               </div>
 
-              {loading ? (
-                <div style={{ textAlign: "center", padding: "40px" }}>Loading community prompts...</div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: "24px" }}>
-                  {filteredPrompts.length === 0 ? (
-                    <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "80px", background: "rgba(255, 255, 255, 0.7)", borderRadius: "32px", border: "1px dashed #D4AF37" }}>
-                      No public prompts found.
-                    </div>
-                  ) : (
-                    filteredPrompts.map((p) => (
-                      <div key={p.id} style={{
-                        background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)",
-                        border: "1px solid rgba(212, 175, 55, 0.5)", borderRadius: "28px", padding: "28px",
-                        display: "flex", flexDirection: "column", gap: "18px", transition: "transform 0.2s ease",
-                        boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)", position: "relative"
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
-                      onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                        
-                        {/* Header Row */}
-                        <div className="flex flex-row items-start justify-between gap-2 w-full">
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 1, minWidth: 0 }}>
-                            <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", color: "#4B5563", flexShrink: 0 }}>
-                              {p.author_email.charAt(0).toUpperCase()}
-                            </div>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#4B5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {p.author_email.split('@')[0]}
-                            </span>
-                          </div>
-                          <span style={{ 
-                            background: "rgba(212, 175, 55, 0.15)", color: "#AA8A27", 
-                            padding: "4px 8px", borderRadius: "8px", fontSize: "10px", 
-                            fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px",
-                            lineHeight: 1.2, display: "inline-block", wordBreak: "break-word", flexShrink: 0 
-                          }}>
-                            {p.category}
-                          </span>
-                        </div>
-                        
-                        <h3 style={{ color: "#000000", fontSize: "20px", fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
-                          {p.name}
-                        </h3>
-                        
-                        <div style={{
-                          background: "rgba(249, 250, 251, 0.6)", borderRadius: "16px", padding: "16px",
-                          color: "#1f2937", fontSize: "14px", lineHeight: "1.6", height: "100px",
-                          overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical"
-                        }}>
-                          {p.prompt_text}
-                        </div>
-                        
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                          {p.tags.map((tag, idx) => (
-                            <span key={idx} style={{ color: "#4b5563", fontSize: "11px", background: "rgba(243, 244, 246, 0.8)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(212, 175, 55, 0.2)" }}>
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Actions Row */}
-                        <div className="flex flex-wrap items-center justify-between mt-auto border-t border-black/5 pt-4 gap-3">
-                          
-                          <button onClick={() => handleUpvote(p.id)} style={{
-                            display: "flex", alignItems: "center", gap: "6px", background: p.has_upvoted ? "#F4CE14" : "rgba(0,0,0,0.05)",
-                            border: "none", borderRadius: "10px", padding: "8px 12px", color: "#000", fontSize: "13px", fontWeight: 700, cursor: "pointer", transition: "background 0.2s"
-                          }}>
-                            <ThumbsUp size={16} fill={p.has_upvoted ? "#000" : "none"} /> {p.upvotes}
-                          </button>
-                          
-
-                        </div>
-
-                        {/* Report Link */}
-                        <button onClick={() => handleReport(p.id)} style={{
-                          position: "absolute", bottom: "16px", right: "24px", background: "none", border: "none",
-                          color: "#9CA3AF", fontSize: "10px", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer",
-                          opacity: 0.6
-                        }}>
-                          <TriangleAlert size={10} /> Report
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+              {/* Directly reuse TemplateSection component */}
+              <TemplateSection onSelect={handleSelectTemplate} />
+              
             </div>
           </div>
 

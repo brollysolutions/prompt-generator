@@ -241,6 +241,12 @@ export default function HistoryPage() {
         <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
             <Link 
+              href="/templates"
+              className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
+            >
+              Templates
+            </Link>
+            <Link 
               href="/generator"
               className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
             >

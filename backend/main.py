@@ -43,7 +43,12 @@ from database import (
     publish_to_community,
     get_community_prompts,
     upvote_community_prompt,
-    save_community_prompt_to_library
+    save_community_prompt_to_library,
+    get_templates,
+    get_template_by_id,
+    create_template,
+    update_template,
+    delete_template
 )
 
 app = FastAPI()
@@ -436,4 +441,52 @@ async def report_community_prompt(prompt_id: int):
     # Dummy endpoint to satisfy the frontend reporting feature requirement
     # Normally this would log a report to the database and notify an admin
     return {"message": "Prompt reported successfully"}
+
+# =========================
+# TEMPLATES API
+# =========================
+
+class TemplateRequest(BaseModel):
+    name: str
+    category: str
+    description: str
+    template_text: str
+    icon: str = "file-text"
+
+@app.get("/api/templates")
+async def api_get_templates(category: str = None, search: str = None):
+    templates = get_templates(category, search)
+    return templates
+
+@app.get("/api/templates/{template_id}")
+async def api_get_template(template_id: str):
+    template = get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return template
+
+@app.post("/api/templates")
+async def api_create_template(data: TemplateRequest):
+    import uuid
+    template_id = str(uuid.uuid4())
+    create_template(
+        template_id, data.name, data.category, data.description, data.template_text, data.icon
+    )
+    return {"id": template_id, "message": "Template created successfully"}
+
+@app.put("/api/templates/{template_id}")
+async def api_update_template(template_id: str, data: TemplateRequest):
+    success = update_template(
+        template_id, data.name, data.category, data.description, data.template_text, data.icon
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"message": "Template updated successfully"}
+
+@app.delete("/api/templates/{template_id}")
+async def api_delete_template(template_id: str):
+    success = delete_template(template_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"message": "Template deleted successfully"}
 

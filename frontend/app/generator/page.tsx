@@ -16,6 +16,7 @@ const PROVIDER_MODELS: Record<string, string[]> = {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GetStartedButton } from "@/components/ui/get-started-button";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/context/AuthContext";
@@ -367,6 +368,12 @@ export default function GeneratorPage() {
             <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
               <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
                 <Link 
+                  href="/templates"
+                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
+                >
+                  Templates
+                </Link>
+                <Link 
                   href="/library"
                   className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
                 >
@@ -496,6 +503,7 @@ export default function GeneratorPage() {
               animate={{ opacity: 1, y: 0 }}
               id="generator-wrapper"
             >
+
               {/* Input Card with Static Gold Border */}
               <div className="bg-white/70 backdrop-blur-md border border-[#D4AF37]/50 p-5 md:p-8 w-full rounded-3xl mb-7 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
