@@ -83,6 +83,41 @@ def init_db():
     except sqlite3.OperationalError:
         pass # Column already exists
         
+    # Migration: Add is_pro to users if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_pro INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS prompt_usage_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            prompt_id TEXT,
+            category TEXT,
+            quality_score NUMERIC,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS shared_prompts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            share_token TEXT UNIQUE NOT NULL,
+            prompt_text TEXT NOT NULL,
+            quality_score INTEGER,
+            category TEXT,
+            language TEXT,
+            created_by INTEGER NOT NULL,
+            author_name TEXT,
+            visibility TEXT DEFAULT 'public',
+            expires_at TIMESTAMP,
+            revoked_at TIMESTAMP,
+            view_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -669,5 +704,170 @@ def delete_template(template_id: str):
     conn.close()
     return rows_affected > 0
 
+# =========================
+# ANALYTICS API (PRO FEATURE)
+# =========================
+
+def toggle_user_pro_status(user_id: int) -> bool:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT is_pro FROM users WHERE id = ?', (user_id,))
+    row = cursor.fetchone()
+    if row is None:
+        conn.close()
+        return False
+    new_status = 1 if row[0] == 0 else 0
+    cursor.execute('UPDATE users SET is_pro = ? WHERE id = ?', (new_status, user_id))
+    conn.commit()
+    conn.close()
+    return True
+
+def record_prompt_usage(user_id: int, prompt_id: str, category: str, quality_score: float):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO prompt_usage_events (user_id, prompt_id, category, quality_score)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, prompt_id, category, quality_score))
+    conn.commit()
+    conn.close()
+
+def get_analytics_overview(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*), AVG(quality_score) FROM prompt_usage_events WHERE user_id = ?', (user_id,))
+    row = cursor.fetchone()
+    total_prompts = row[0] if row[0] else 0
+    average_quality_score = round(row[1], 1) if row[1] else 0.0
+    
+    # Calculate simple streak (days in a row including today/yesterday)
+    cursor.execute('''
+        SELECT DATE(created_at) as usage_date 
+        FROM prompt_usage_events 
+        WHERE user_id = ? 
+        GROUP BY usage_date 
+        ORDER BY usage_date DESC
+    ''', (user_id,))
+    dates = [r[0] for r in cursor.fetchall()]
+    conn.close()
+    
+    streak = 0
+    from datetime import datetime
+    current_date = datetime.utcnow().date()
+    if dates:
+        last_date = datetime.strptime(dates[0], "%Y-%m-%d").date()
+        if (current_date - last_date).days <= 1:
+            streak = 1
+            for i in range(1, len(dates)):
+                d1 = datetime.strptime(dates[i-1], "%Y-%m-%d").date()
+                d2 = datetime.strptime(dates[i], "%Y-%m-%d").date()
+                if (d1 - d2).days == 1:
+                    streak += 1
+                else:
+                    break
+    
+    return {
+        "total_prompts": total_prompts,
+        "average_quality_score": average_quality_score,
+        "current_streak_days": streak
+    }
+
+def get_most_used_prompts(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT category as name, COUNT(*) as usage_count 
+        FROM prompt_usage_events 
+        WHERE user_id = ? AND category IS NOT NULL AND category != ''
+        GROUP BY category 
+        ORDER BY usage_count DESC 
+        LIMIT 5
+    ''', (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_quality_trend(user_id: int, days: int = 30):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(f'''
+        SELECT DATE(created_at) as date, AVG(quality_score) as average_score
+        FROM prompt_usage_events
+        WHERE user_id = ? AND created_at >= date('now', '-{days} days')
+        GROUP BY date
+        ORDER BY date ASC
+    ''', (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# =======================
+# SHARE LINK FUNCTIONS
+# =======================
+
+def create_shared_prompt(share_token: str, prompt_text: str, quality_score: int, category: str, language: str, created_by: int, author_name: str, visibility: str = 'public', expires_at: str = None) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO shared_prompts (share_token, prompt_text, quality_score, category, language, created_by, author_name, visibility, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (share_token, prompt_text, quality_score, category, language, created_by, author_name, visibility, expires_at))
+    record_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return record_id
+
+def get_shared_prompt_by_token(share_token: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM shared_prompts 
+        WHERE share_token = ?
+    ''', (share_token,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def increment_share_view_count(share_token: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE shared_prompts 
+        SET view_count = view_count + 1 
+        WHERE share_token = ?
+    ''', (share_token,))
+    conn.commit()
+    conn.close()
+
+def list_user_shares(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM shared_prompts 
+        WHERE created_by = ? AND revoked_at IS NULL
+        ORDER BY created_at DESC
+    ''', (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def revoke_share_link(share_token: str, user_id: int) -> bool:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE shared_prompts 
+        SET revoked_at = CURRENT_TIMESTAMP 
+        WHERE share_token = ? AND created_by = ?
+    ''', (share_token, user_id))
+    success = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return success
+
 init_db()
 seed_templates()
+

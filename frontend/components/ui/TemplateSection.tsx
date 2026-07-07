@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Search, Mail, FileText, Code, Image as ImageIcon, BarChart, Search as SearchIcon, X, Filter } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -30,12 +31,17 @@ export default function TemplateSection({ onSelect }: { onSelect: (templateText:
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const fetchTemplates = async () => {
       setLoading(true);
       try {
-        let url = "http://127.0.0.1:8000/api/templates?";
+        let url = `${process.env.NEXT_PUBLIC_API_URL}/api/templates?`;
         if (category !== "All") {
           url += `category=${encodeURIComponent(category)}&`;
         }
@@ -138,70 +144,73 @@ export default function TemplateSection({ onSelect }: { onSelect: (templateText:
       )}
 
       {/* Preview Modal */}
-      <AnimatePresence>
-        {selectedTemplate && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setSelectedTemplate(null)}
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-2xl shadow-2xl relative z-10 overflow-hidden"
-            >
-              <div className="flex justify-between items-center p-5 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
-                    {ICON_MAP[selectedTemplate.icon] || <FileText size={20} />}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {selectedTemplate && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                onClick={() => setSelectedTemplate(null)}
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white w-full max-w-lg rounded-2xl shadow-2xl relative z-10 overflow-hidden"
+              >
+                <div className="flex justify-between items-center p-5 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-[#D4AF37]">
+                      {ICON_MAP[selectedTemplate.icon] || <FileText size={20} />}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 m-0">{selectedTemplate.name}</h3>
+                      <span className="text-xs text-[#D4AF37] font-medium">{selectedTemplate.category}</span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 m-0">{selectedTemplate.name}</h3>
-                    <span className="text-xs text-[#D4AF37] font-medium">{selectedTemplate.category}</span>
+                  <button 
+                    onClick={() => setSelectedTemplate(null)}
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <div className="p-5">
+                  <p className="text-sm text-gray-600 mb-4">{selectedTemplate.description}</p>
+                  <div className="bg-[#f9fafb] border border-gray-200 rounded-xl p-4">
+                    <p className="text-sm text-gray-800 font-mono whitespace-pre-wrap m-0 leading-relaxed">
+                      {selectedTemplate.template_text}
+                    </p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedTemplate(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="p-5">
-                <p className="text-sm text-gray-600 mb-4">{selectedTemplate.description}</p>
-                <div className="bg-[#f9fafb] border border-gray-200 rounded-xl p-4">
-                  <p className="text-sm text-gray-800 font-mono whitespace-pre-wrap m-0 leading-relaxed">
-                    {selectedTemplate.template_text}
-                  </p>
+                
+                <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                  <button 
+                    onClick={() => setSelectedTemplate(null)}
+                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      onSelect(selectedTemplate.template_text);
+                      setSelectedTemplate(null);
+                    }}
+                    className="px-5 py-2 text-sm font-bold bg-[#D4AF37] text-black rounded-lg hover:bg-[#AA8A27] transition-colors shadow-sm"
+                  >
+                    Use Template
+                  </button>
                 </div>
-              </div>
-              
-              <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setSelectedTemplate(null)}
-                  className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => {
-                    onSelect(selectedTemplate.template_text);
-                    setSelectedTemplate(null);
-                  }}
-                  className="px-5 py-2 text-sm font-bold bg-[#D4AF37] text-black rounded-lg hover:bg-[#AA8A27] transition-colors shadow-sm"
-                >
-                  Use Template
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

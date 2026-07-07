@@ -43,13 +43,13 @@ class GroqWrapper:
                     try:
                         from groq import AsyncGroq
                         client = AsyncGroq(api_key=key)
-                        print(f"\n[DEBUG] 🚀 Attempting with Groq API Key ending in: ...{key[-4:]}")
+                        print(f"\n[DEBUG] Attempting with Groq API Key ending in: ...{key[-4:]}")
                         return await client.chat.completions.create(**kwargs)
                     except Exception as e:
                         last_err = e
-                        print(f"[DEBUG] ⚠️ Key ...{key[-4:]} failed (Rate Limit?). Retrying next key... Error: {str(e)[:60]}")
+                        print(f"[DEBUG] Key ...{key[-4:]} failed (Rate Limit?). Retrying next key... Error: {str(e)[:60]}")
                         continue
-                print("[ERROR] ❌ ALL 7 GROQ KEYS EXHAUSTED!")
+                print("[ERROR] ALL GROQ KEYS EXHAUSTED!")
                 raise last_err
 
     @property
@@ -184,7 +184,7 @@ Return ONLY a JSON object matching this exact schema:
 # GENERATE FINAL PROMPT
 # =========================
 
-async def generate_final_prompt(user_input, answers, questions=None, target_ai="", caveman_mode=False):
+async def generate_final_prompt(user_input, answers, questions=None, target_ai="", tone="Auto", output_format="Auto", length="Auto", role="", caveman_mode=False):
     try:
         # Build detailed Q&A context using question text if available
         qa_lines = []
@@ -210,16 +210,25 @@ async def generate_final_prompt(user_input, answers, questions=None, target_ai="
         if caveman_mode:
             caveman_instruction = "ON (Token Compression active: strip linguistic filler, use primitive but high-reasoning language)."
             
+        advanced_instructions = []
+        if tone and tone != "Auto": advanced_instructions.append(f"- Tone: {tone}")
+        if output_format and output_format != "Auto": advanced_instructions.append(f"- Output Format: {output_format}")
+        if length and length != "Auto": advanced_instructions.append(f"- Length: {length}")
+        if role and role.strip(): advanced_instructions.append(f"- Persona/Role: {role} (Override the default persona with this)")
+        
+        advanced_text = "None specified"
+        if advanced_instructions:
+            advanced_text = "CRITICAL: MUST OBEY the following:\n" + "\n".join(advanced_instructions)
+            
         language_instruction = """
-### LANGUAGE PROTOCOL ###
-You MUST output the prompt in the EXACT SAME LANGUAGE as the user's input and answers.
-- If user writes in English -> Output MUST be 100% English.
-- If user writes in Teluglish (Telugu in English letters) -> Output MUST be meaningful, conversational Teluglish.
-  Example of good Teluglish: "Mee app target audience evaru?", "Idi enduku use chestaru?"
-- If user writes in Hinglish (Hindi in English letters) -> Output MUST be meaningful, conversational Hinglish.
-  Example of good Hinglish: "Aapka target audience kaun hai?", "Yeh app kiske liye banaya gaya hai?"
-
-NEVER use native Telugu script or Devanagari script under any circumstances. Always use English characters (A-Z).
+### CRITICAL LANGUAGE PROTOCOL ###
+You MUST detect if the user's intent is in English, Hinglish, or Teluglish.
+If the input is Hinglish (Hindi in English letters) or Teluglish (Telugu in English letters), YOU MUST WRITE THE ENTIRE `smart_prompt` CONTENT IN THAT EXACT LANGUAGE. 
+- You can keep the Markdown headers (like # Role & Persona) in English.
+- However, EVERY SINGLE SENTENCE, instruction, and rule underneath those headers MUST BE translated into the user's conversational language (Hinglish or Teluglish).
+- Example of good Hinglish instructions: "Aap ek expert AI assistant hain. Aapka kaam hai customer support agent app banana. Yeh app mobile aur web dono par chalna chahiye."
+- NEVER output standard English paragraphs if the user spoke to you in Hinglish or Teluglish!
+- NEVER use Devanagari or Telugu scripts. Use English characters (A-Z) only.
 """
 
         prompt = f"""You are the World's Greatest Expert AI Prompt Engineer. Your mission is to take a raw user idea and their specific responses to clarifying questions to craft a master execution prompt that is highly relevant, clear, and context-aware.
@@ -236,6 +245,7 @@ Before writing the prompt, perform a deep-dive analysis of the input idea and re
 3. **Model Optimization:** {optimization_instruction}
 4. **Language Structure:** {caveman_instruction}
 5. **Target Language:** {language_instruction}
+6. **Advanced Controls:** {advanced_text}
 
 ---
 ## TASK
@@ -302,6 +312,8 @@ Return ONLY a JSON object matching this schema:
         
         return final_data
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"EXCEPTION in generate_final_prompt: {str(e)}")
         return {
             "title": "Generated Prompt (Fallback)",

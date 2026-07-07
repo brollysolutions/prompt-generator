@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Header from "@/components/ui/Header";
 import { useRouter } from "next/navigation";
 import { RotateCcw, Edit, Maximize2, X, Trash2, User, Settings, LogOut, Key, Save, Edit2, ChevronDown } from "lucide-react";
 
@@ -97,7 +98,7 @@ export default function HistoryPage() {
     if (!sid) return;
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history?session_id=${sid}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history?session_id=${sid}`);
       const data = await response.json();
       setPromptHistory(data.history || []);
     } catch (error) {
@@ -129,7 +130,7 @@ export default function HistoryPage() {
   const handleSaveEdit = async (versionId: number) => {
     try {
       setIsSavingEdit(true);
-      const response = await fetch(`http://127.0.0.1:8000/history`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -160,7 +161,7 @@ export default function HistoryPage() {
   const confirmDelete = async () => {
     if (versionToDelete === null) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/history/${versionToDelete}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history/${versionToDelete}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -192,7 +193,7 @@ export default function HistoryPage() {
       }
 
       // Create a new version for the restore action
-      const response = await fetch(`http://127.0.0.1:8000/history`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -237,102 +238,7 @@ export default function HistoryPage() {
       color: "#000000",
     }}>
       {/* Header */}
-      <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
-          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
-            <Link 
-              href="/templates"
-              className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-            >
-              Templates
-            </Link>
-            <Link 
-              href="/generator"
-              className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-            >
-              Generator
-            </Link>
-            <Link 
-              href="/library"
-              className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-            >
-              Library
-            </Link>
-            <Link 
-              href="/community"
-              className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-            >
-              Community
-            </Link>
-          </div>
-          <div className="relative shrink-0 ml-1">
-              <button
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
-              >
-                <User size={18} />
-              </button>
-              {isProfileOpen && (
-                <div style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: "8px",
-                  background: "#fff",
-                  border: "1px solid #eaeaea",
-                  borderRadius: "8px",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                  minWidth: "120px",
-                  zIndex: 101
-                }}>
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      setIsSettingsOpen(true);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "10px 16px",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      color: "#333",
-                      textAlign: "left",
-                      borderBottom: "1px solid #eaeaea"
-                    }}
-                  >
-                    <Settings size={16} /> Settings
-                  </button>
-                  <button
-                    onClick={logout}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "10px 16px",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      color: "#e11d48",
-                      textAlign: "left"
-                    }}
-                  >
-                    <LogOut size={16} /> Logout
-                  </button>
-                </div>
-              )}
-          </div>
-        </div>
-      </nav>
+      <Header onOpenSettings={() => setIsSettingsOpen(true)} />
 
       {/* Full Page Background Waves */}
       <div className="bg-wave-container">
@@ -352,23 +258,21 @@ export default function HistoryPage() {
 
       <div style={{ position: "relative", zIndex: 1 }}>
         <div className="max-w-[900px] mx-auto px-4 py-8 md:px-6 md:py-12 md:pb-20">
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "40px" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "40px", textAlign: "center" }}>
             <div style={{
-              width: "48px", height: "48px",
+              width: "60px", height: "60px",
               background: "#D4AF37",
-              borderRadius: "14px",
+              borderRadius: "18px",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "24px",
+              fontSize: "30px", marginBottom: "20px",
               color: "#000000"
             }}>📜</div>
-            <div>
-              <h1 style={{ color: "#000000", fontSize: "32px", fontWeight: 800, margin: 0, letterSpacing: "-1px" }}>
-                Version History
-              </h1>
-              <p style={{ color: "#374151", fontSize: "16px", margin: "4px 0 0", fontWeight: 500 }}>
-                View, compare, and restore your previous prompt versions.
-              </p>
-            </div>
+            <h1 style={{ color: "#000000", fontSize: "42px", fontWeight: 800, margin: 0, letterSpacing: "-1.5px" }}>
+              Version History
+            </h1>
+            <p style={{ color: "#374151", fontSize: "18px", margin: "10px 0 0", maxWidth: "600px", fontWeight: 500 }}>
+              View, compare, and restore your previous prompt versions.
+            </p>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -397,7 +301,7 @@ export default function HistoryPage() {
                   gap: "20px",
                   boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
                 }}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-row flex-wrap items-center justify-between gap-3">
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <span style={{
                         background: version.source.includes('generated') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(212, 175, 55, 0.1)',

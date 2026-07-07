@@ -37,7 +37,7 @@ export default function SignupPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("http://127.0.0.1:8000/auth/google", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential }),
@@ -73,7 +73,7 @@ export default function SignupPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      const response = await fetch("http://127.0.0.1:8000/signup", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

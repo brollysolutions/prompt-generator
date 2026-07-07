@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Header from "@/components/ui/Header";
 import { Copy, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, ThumbsUp, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -94,7 +95,7 @@ export default function CommunityPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/community?user_id=${user.id}&sort_by=${sortBy}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community?user_id=${user.id}&sort_by=${sortBy}`);
       const data = await response.json();
       setPrompts(data.prompts || []);
     } catch (error) {
@@ -126,7 +127,7 @@ export default function CommunityPage() {
     }));
 
     try {
-      await fetch("http://127.0.0.1:8000/community/upvote", {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/upvote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt_id: promptId, user_id: user.id })
@@ -142,7 +143,7 @@ export default function CommunityPage() {
     if (!user) return;
     try {
       setSavingIds(prev => ({ ...prev, [promptId]: true }));
-      const response = await fetch("http://127.0.0.1:8000/community/save", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt_id: promptId, user_id: user.id })
@@ -170,7 +171,7 @@ export default function CommunityPage() {
   const handleReport = async (promptId: number) => {
     if (window.confirm("Are you sure you want to report this prompt for inappropriate content?")) {
       try {
-        await fetch(`http://127.0.0.1:8000/community/report/${promptId}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/report/${promptId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: user?.id })
@@ -211,50 +212,7 @@ export default function CommunityPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
-            <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
-              <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
-                <Link href="/templates" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
-                  Templates
-                </Link>
-                <Link href="/generator" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
-                  Generator
-                </Link>
-                <Link href="/library" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
-                  Library
-                </Link>
-                <Link href="/history" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0">
-                  History
-                </Link>
-                <Link href="/community" className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0 shadow-[inset_0_0_0_1px_#D4AF37]">
-                  Community
-                </Link>
-              </div>
-              <div className="relative shrink-0 ml-1">
-                  <button
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
-                  >
-                    <User size={18} />
-                  </button>
-                  {isProfileOpen && (
-                    <div style={{
-                      position: "absolute", top: "100%", right: 0, marginTop: "8px",
-                      background: "#fff", border: "1px solid #eaeaea", borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)", display: "flex",
-                      flexDirection: "column", overflow: "hidden", minWidth: "120px", zIndex: 101
-                    }}>
-                      <button onClick={() => { setIsProfileOpen(false); setIsSettingsOpen(true); }} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "#333", textAlign: "left", borderBottom: "1px solid #eaeaea" }}>
-                        <Settings size={16} /> Settings
-                      </button>
-                      <button onClick={logout} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "#e11d48", textAlign: "left" }}>
-                        <LogOut size={16} /> Logout
-                      </button>
-                    </div>
-                  )}
-              </div>
-            </div>
-          </nav>
+          <Header onOpenSettings={() => setIsSettingsOpen(true)} />
 
           {/* Full Page Background Waves */}
           <div className="bg-wave-container">
@@ -388,11 +346,11 @@ export default function CommunityPage() {
                         </div>
                         
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                          {p.tags.map((tag, idx) => (
+                          {Array.isArray(p.tags) ? p.tags.map((tag: any, idx: number) => (
                             <span key={idx} style={{ color: "#4b5563", fontSize: "11px", background: "rgba(243, 244, 246, 0.8)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(212, 175, 55, 0.2)" }}>
                               #{tag}
                             </span>
-                          ))}
+                          )) : null}
                         </div>
 
                         {/* Actions Row */}

@@ -35,7 +35,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("http://127.0.0.1:8000/auth/google", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential }),
@@ -62,7 +62,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/login", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShieldCheck, Copy, Play, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown } from "lucide-react";
+import { ShieldCheck, Copy, Play, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, Share } from "lucide-react";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -15,7 +15,9 @@ const PROVIDER_MODELS: Record<string, string[]> = {
 };
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Header from "@/components/ui/Header";
 import { GetStartedButton } from "@/components/ui/get-started-button";
+import ShareDialog from "@/components/ui/ShareDialog";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -57,10 +59,16 @@ export default function GeneratorPage() {
   const [answers, setAnswers] = useState<{ [key: number]: string | string[] }>({});
   const [customAnswers, setCustomAnswers] = useState<{ [key: number]: string }>({});
   const [finalPrompt, setFinalPrompt] = useState<SmartPromptResult | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [loadingPrompt, setLoadingPrompt] = useState(false);
   const [copied, setCopied] = useState(false);
   const [targetAi, setTargetAi] = useState("");
+  const [tone, setTone] = useState("Auto");
+  const [outputFormat, setOutputFormat] = useState("Auto");
+  const [length, setLength] = useState("Auto");
+  const [role, setRole] = useState("");
+  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [sessionId, setSessionId] = useState<string>("");
   const [internalPrompt, setInternalPrompt] = useState<string>("");
 
@@ -123,6 +131,10 @@ export default function GeneratorPage() {
       const savedCustomAnswers = localStorage.getItem("customAnswers");
       const savedFinalPrompt = localStorage.getItem("finalPrompt");
       const savedTargetAi = localStorage.getItem("targetAi");
+      const savedTone = localStorage.getItem("tone");
+      const savedOutputFormat = localStorage.getItem("outputFormat");
+      const savedLength = localStorage.getItem("length");
+      const savedRole = localStorage.getItem("role");
       const savedTestResponse = localStorage.getItem("testResponse");
       const savedInternalPrompt = localStorage.getItem("internalPrompt");
 
@@ -132,6 +144,10 @@ export default function GeneratorPage() {
       if (savedCustomAnswers) setCustomAnswers(JSON.parse(savedCustomAnswers));
       if (savedFinalPrompt) setFinalPrompt(JSON.parse(savedFinalPrompt));
       if (savedTargetAi) setTargetAi(savedTargetAi);
+      if (savedTone) setTone(savedTone);
+      if (savedOutputFormat) setOutputFormat(savedOutputFormat);
+      if (savedLength) setLength(savedLength);
+      if (savedRole) setRole(savedRole);
       if (savedTestResponse) setTestResponse(savedTestResponse);
       if (savedInternalPrompt) setInternalPrompt(savedInternalPrompt);
     };
@@ -165,6 +181,22 @@ export default function GeneratorPage() {
   }, [targetAi]);
 
   useEffect(() => {
+    if (tone) localStorage.setItem("tone", tone);
+  }, [tone]);
+
+  useEffect(() => {
+    if (outputFormat) localStorage.setItem("outputFormat", outputFormat);
+  }, [outputFormat]);
+
+  useEffect(() => {
+    if (length) localStorage.setItem("length", length);
+  }, [length]);
+
+  useEffect(() => {
+    if (role) localStorage.setItem("role", role);
+  }, [role]);
+
+  useEffect(() => {
     if (testResponse) localStorage.setItem("testResponse", testResponse);
   }, [testResponse]);
 
@@ -184,7 +216,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch("http://127.0.0.1:8000/test-prompt", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/test-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
@@ -209,7 +241,7 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch("http://127.0.0.1:8000/generate-questions", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_input: userInput }),
@@ -257,7 +289,7 @@ export default function GeneratorPage() {
         }
       });
 
-      const response = await fetch("http://127.0.0.1:8000/generate-final-prompt", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-final-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -265,6 +297,10 @@ export default function GeneratorPage() {
           answers: processedAnswers,
           questions,
           target_ai: targetAi,
+          tone: tone,
+          output_format: outputFormat,
+          length: length,
+          role: role,
           internal_prompt: internalPrompt,
           user_id: user?.id || 0,
         }),
@@ -275,7 +311,7 @@ export default function GeneratorPage() {
 
       // Save to history
       try {
-        await fetch("http://127.0.0.1:8000/history", {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -291,7 +327,7 @@ export default function GeneratorPage() {
 
       // Auto-score the generated prompt
       try {
-        const scoreResponse = await fetch("http://127.0.0.1:8000/score-prompt", {
+        const scoreResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/score-prompt`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText }),
@@ -364,121 +400,7 @@ export default function GeneratorPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <nav className="bg-white border-b border-[#D4AF37] px-4 py-3 md:px-6 md:py-4 sticky top-0 z-[100] shadow-sm w-full box-border">
-            <div className="max-w-[1200px] mx-auto flex items-center justify-end w-full">
-              <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 overflow-x-auto whitespace-nowrap pb-1 md:pb-0 scrollbar-hide flex-1 justify-start md:justify-end pr-1 md:pr-0 min-w-0">
-                <Link 
-                  href="/templates"
-                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-                >
-                  Templates
-                </Link>
-                <Link 
-                  href="/library"
-                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-                >
-                  Library
-                </Link>
-                <Link 
-                  href="/history"
-                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-                >
-                  History
-                </Link>
-                <Link 
-                  href="/community"
-                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black rounded-[8px] md:rounded-[10px] no-underline shrink-0"
-                >
-                  Community
-                </Link>
-                <button
-                  onClick={() => {
-                    const keysToRemove = [
-                      "userInput",
-                      "questions",
-                      "answers",
-                      "customAnswers",
-                      "finalPrompt",
-                      "targetAi",
-                      "testResponse",
-                      "internalPrompt"
-                    ];
-                    keysToRemove.forEach(key => localStorage.removeItem(key));
-                    window.location.reload();
-                  }}
-                  className="px-2.5 py-1.5 md:px-4 md:py-2 text-[11px] sm:text-xs md:text-[13px] font-semibold text-white bg-black border-none rounded-[8px] md:rounded-[10px] cursor-pointer shrink-0"
-                >
-                  Reset
-                </button>
-              </div>
-              <div className="relative shrink-0 ml-1">
-                  <button
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
-                  >
-                    <User size={18} />
-                  </button>
-                  {isProfileOpen && (
-                    <div style={{
-                      position: "absolute",
-                      top: "100%",
-                      right: 0,
-                      marginTop: "8px",
-                      background: "#fff",
-                      border: "1px solid #eaeaea",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      display: "flex",
-                      flexDirection: "column",
-                      overflow: "hidden",
-                      minWidth: "120px",
-                      zIndex: 101
-                    }}>
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          setIsSettingsOpen(true);
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "10px 16px",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          color: "#333",
-                          textAlign: "left",
-                          borderBottom: "1px solid #eaeaea"
-                        }}
-                      >
-                        <Settings size={16} /> Settings
-                      </button>
-                      <button
-                        onClick={logout}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "10px 16px",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          color: "#e11d48",
-                          textAlign: "left"
-                        }}
-                      >
-                        <LogOut size={16} /> Logout
-                      </button>
-                    </div>
-                  )}
-              </div>
-            </div>
-          </nav>
+          <Header showReset={true} onOpenSettings={() => setIsSettingsOpen(true)} />
 
           {/* Full Page Background Waves */}
           <div className="bg-wave-container">
@@ -497,7 +419,7 @@ export default function GeneratorPage() {
           </div>
 
           <div style={{ position: "relative", zIndex: 1 }}>
-            <div className="max-w-[900px] mx-auto px-4 py-8 md:px-6 md:py-12 md:pb-20">
+            <div className="max-w-[900px] mx-auto px-4 pt-10 pb-8 md:px-6 md:py-12 md:pb-20">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -551,28 +473,28 @@ export default function GeneratorPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="bg-white/70 backdrop-blur-md border border-[#D4AF37]/50 rounded-[24px] p-5 md:p-8 mb-7 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]"
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "28px", width: "100%" }}>
                       <div style={{
-                        width: "36px", height: "36px",
+                        width: "36px", height: "36px", minWidth: "36px",
                         background: "#D4AF37",
                         borderRadius: "10px",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "16px",
                         color: "#000000"
                       }}>❓</div>
-                      <div>
-                        <h2 className="text-black text-lg md:text-[22px] font-bold m-0">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h2 className="text-black text-base md:text-[22px] font-bold m-0" style={{ whiteSpace: "normal", wordBreak: "break-word", lineHeight: "1.2" }}>
                           AI Follow-up Questions
                         </h2>
-                        <p className="text-[#D4AF37] text-xs md:text-[13px] mt-1 mb-0">
+                        <p className="text-[#D4AF37] text-[11px] md:text-[13px] mt-1 mb-0" style={{ whiteSpace: "normal", wordBreak: "break-word", lineHeight: "1.2" }}>
                           Answer these to generate a precise smart prompt
                         </p>
                       </div>
                       <div style={{
-                        marginLeft: "auto",
                         background: "#f3f4f6", color: "#D4AF37",
                         border: "1px solid #D4AF37",
-                        borderRadius: "20px", padding: "4px 12px", fontSize: "13px", fontWeight: 600,
+                        borderRadius: "20px", padding: "4px 8px", fontSize: "11px", fontWeight: 600,
+                        whiteSpace: "nowrap", flexShrink: 0
                       }}>
                         {questions.length} questions
                       </div>
@@ -838,33 +760,86 @@ export default function GeneratorPage() {
                     ))}
 
                     <div style={{ marginTop: "20px", marginBottom: "15px" }}>
-                      <label style={{ display: "block", color: "#374151", fontSize: "14px", fontWeight: 600, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                        Target AI Model
-                      </label>
-                      <select
-                        value={targetAi}
-                        onChange={(e) => setTargetAi(e.target.value)}
+                      <button 
+                        onClick={() => setShowAdvancedControls(!showAdvancedControls)}
                         style={{
-                          width: "100%",
-                          padding: "14px 18px",
-                          background: "rgba(255, 255, 255, 0.9)",
-                          border: "1px solid #D4AF37",
-                          borderRadius: "12px",
-                          color: "#000000",
-                          fontSize: "15px",
-                          outline: "none",
-                          cursor: "pointer",
-                          appearance: "none",
+                          display: "flex", alignItems: "center", gap: "8px",
+                          background: "none", border: "none", color: "#D4AF37",
+                          fontSize: "14px", fontWeight: 700, cursor: "pointer",
+                          padding: "8px 0"
                         }}
                       >
-                        <option value="">Universal / No specific model</option>
-                        <option value="ChatGPT (GPT-4o/o1)">ChatGPT (GPT-4o/o1)</option>
-                        <option value="Claude 3.5 Sonnet/Opus">Claude 3.5 Sonnet/Opus</option>
-                        <option value="Gemini 1.5 Pro/Flash">Gemini 1.5 Pro/Flash</option>
-                        <option value="Perplexity AI">Perplexity AI</option>
-                        <option value="DeepSeek v3/R1">DeepSeek v3/R1</option>
-                        <option value="Groq / Llama 3">Groq / Llama 3</option>
-                      </select>
+                        <Settings size={16} />
+                        Advanced Controls
+                        <ChevronDown size={16} style={{ transform: showAdvancedControls ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+                      </button>
+
+                      <AnimatePresence>
+                        {showAdvancedControls && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            style={{ overflow: "hidden" }}
+                          >
+                            <div style={{ padding: "16px", background: "rgba(255, 255, 255, 0.5)", borderRadius: "16px", border: "1px solid rgba(212, 175, 55, 0.3)", marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                              
+                              <div style={{ gridColumn: "1 / -1" }}>
+                                <label style={{ display: "block", color: "#374151", fontSize: "12px", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase" }}>Target AI Model</label>
+                                <select value={targetAi} onChange={(e) => setTargetAi(e.target.value)} style={{ width: "100%", padding: "12px", background: "#ffffff", border: "1px solid #D4AF37", borderRadius: "8px", fontSize: "14px", outline: "none", cursor: "pointer" }}>
+                                  <option value="">Universal / No specific model</option>
+                                  <option value="ChatGPT (GPT-4o/o1)">ChatGPT (GPT-4o/o1)</option>
+                                  <option value="Claude 3.5 Sonnet/Opus">Claude 3.5 Sonnet/Opus</option>
+                                  <option value="Gemini 1.5 Pro/Flash">Gemini 1.5 Pro/Flash</option>
+                                  <option value="Perplexity AI">Perplexity AI</option>
+                                  <option value="DeepSeek v3/R1">DeepSeek v3/R1</option>
+                                  <option value="Groq / Llama 3">Groq / Llama 3</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", color: "#374151", fontSize: "12px", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase" }}>Tone</label>
+                                <select value={tone} onChange={(e) => setTone(e.target.value)} style={{ width: "100%", padding: "12px", background: "#ffffff", border: "1px solid #D4AF37", borderRadius: "8px", fontSize: "14px", outline: "none", cursor: "pointer" }}>
+                                  <option value="Auto">Auto</option>
+                                  <option value="Formal">Formal</option>
+                                  <option value="Casual">Casual</option>
+                                  <option value="Technical">Technical</option>
+                                  <option value="Professional">Professional</option>
+                                  <option value="Creative">Creative</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", color: "#374151", fontSize: "12px", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase" }}>Output Format</label>
+                                <select value={outputFormat} onChange={(e) => setOutputFormat(e.target.value)} style={{ width: "100%", padding: "12px", background: "#ffffff", border: "1px solid #D4AF37", borderRadius: "8px", fontSize: "14px", outline: "none", cursor: "pointer" }}>
+                                  <option value="Auto">Auto</option>
+                                  <option value="List">List</option>
+                                  <option value="Table">Table</option>
+                                  <option value="Paragraph">Paragraph</option>
+                                  <option value="Code">Code</option>
+                                  <option value="Markdown">Markdown</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", color: "#374151", fontSize: "12px", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase" }}>Length</label>
+                                <select value={length} onChange={(e) => setLength(e.target.value)} style={{ width: "100%", padding: "12px", background: "#ffffff", border: "1px solid #D4AF37", borderRadius: "8px", fontSize: "14px", outline: "none", cursor: "pointer" }}>
+                                  <option value="Auto">Auto</option>
+                                  <option value="Concise">Concise</option>
+                                  <option value="Detailed">Detailed</option>
+                                  <option value="Comprehensive">Comprehensive</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", color: "#374151", fontSize: "12px", fontWeight: 600, marginBottom: "6px", textTransform: "uppercase" }}>Custom Role</label>
+                                <input type="text" value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Senior Developer" style={{ width: "100%", padding: "12px", background: "#ffffff", border: "1px solid #D4AF37", borderRadius: "8px", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                              </div>
+
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     <GetStartedButton
@@ -900,6 +875,24 @@ export default function GeneratorPage() {
                         <span style={{ color: "#000000", fontWeight: 700 }}>Your Smart Prompt</span>
                       </div>
                       <div style={{ display: "flex", gap: "10px" }}>
+                        <button
+                          onClick={() => setIsShareModalOpen(true)}
+                          style={{
+                            padding: "8px 18px",
+                            background: "#f59e0b",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <Share size={16} />
+                          Share
+                        </button>
                         <button
                           onClick={handleCopy}
                           style={{
@@ -1456,6 +1449,16 @@ export default function GeneratorPage() {
           cursor: default;
         }
       `}</style>
+      
+      <ShareDialog
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        promptText={finalPrompt?.prompt || finalPrompt?.smart_prompt || ""}
+        qualityScore={finalPrompt?.quality_score || finalPrompt?.score || 100}
+        category={finalPrompt?.category || "General"}
+        language={"en"} 
+        token={typeof window !== "undefined" ? localStorage.getItem("auth_token") : null}
+      />
   </div>
   );
 }

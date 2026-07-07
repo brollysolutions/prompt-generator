@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from pydantic import BaseModel
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -7,6 +8,7 @@ import logging
 import os
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 import jwt
+import secrets
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from dotenv import load_dotenv
@@ -24,11 +26,27 @@ from services.groq_service import (
     process_prompt_scoring,
     enhance_prompt_text,
     test_generated_prompt,
-    auto_categorize_prompt
+    auto_categorize_prompt,
+    generate_final_prompt as groq_generate_final_prompt
 )
 from services.gemini_service import (
-    generate_final_prompt
+    generate_final_prompt as gemini_generate_final_prompt
 )
+import re
+
+def is_regional_language(text: str) -> bool:
+    text = text.lower()
+    regional_words = {
+        # Hinglish
+        "hai", "kya", "kaise", "mujhe", "mera", "yeh", "karna", "chahiye", "kyu", "kaun", "banayega", "banane", "aap", "tum",
+        # Teluglish
+        "idi", "ela", "cheyali", "naaku", "naku", "oka", "evaru", "endi", "cheppu", "kavali", "gurinchi", "neeku", "neku", "nenu", "memu", "manamu", "chestava", "cheyadaniki"
+    }
+    words = set(re.findall(r'\b\w+\b', text))
+    
+    # Require at least two regional words to trigger, or one highly specific word
+    intersection = words.intersection(regional_words)
+    return len(intersection) >= 2 or bool(intersection.intersection({"kaise", "mujhe", "chahiye", "cheyali", "naaku", "naku", "kavali", "cheyadaniki"}))
 from database import (
     save_prompt_version, 
     get_prompt_history, 
@@ -48,7 +66,17 @@ from database import (
     get_template_by_id,
     create_template,
     update_template,
-    delete_template
+    delete_template,
+    record_prompt_usage,
+    toggle_user_pro_status,
+    get_analytics_overview,
+    get_most_used_prompts,
+    get_quality_trend,
+    create_shared_prompt,
+    get_shared_prompt_by_token,
+    increment_share_view_count,
+    list_user_shares,
+    revoke_share_link
 )
 
 app = FastAPI()
@@ -156,6 +184,10 @@ class FinalPromptRequest(BaseModel):
     answers: dict
     questions: list = []
     target_ai: str = ""
+    tone: str = "Auto"
+    output_format: str = "Auto"
+    length: str = "Auto"
+    role: str = ""
     caveman_mode: bool = False
     user_id: int = 0
 
@@ -193,12 +225,23 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
     questions = data.questions  # pass questions for proper Q&A context labeling
     target_ai = data.target_ai
 
-    # Generate the dynamic prompt using the imported Groq service function
-    result = await generate_final_prompt(
+    if is_regional_language(user_input):
+        logger.info("Detected Regional Language (Hinglish/Teluglish). Routing to Groq Llama 3.3 70B.")
+        generate_final_prompt_func = groq_generate_final_prompt
+    else:
+        logger.info("Detected English. Routing to Gemini AI.")
+        generate_final_prompt_func = gemini_generate_final_prompt
+
+    # Generate the dynamic prompt using the chosen service function
+    result = await generate_final_prompt_func(
         user_input, 
         answers, 
         questions, 
         target_ai, 
+        data.tone,
+        data.output_format,
+        data.length,
+        data.role,
         data.caveman_mode
     )
 
@@ -214,8 +257,15 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
                 category=cat_data.get("category", "General"),
                 user_id=data.user_id
             )
+            if data.user_id > 0:
+                record_prompt_usage(
+                    user_id=data.user_id,
+                    prompt_id=None,
+                    category=cat_data.get("category", "General"),
+                    quality_score=result.get("quality_score", 0)
+                )
     except Exception as e:
-        logger.error(f"Failed to auto-categorize/save to library: {e}")
+        logger.error(f"Failed to auto-categorize/save to library or record usage: {e}")
 
     return result
 
@@ -490,3 +540,148 @@ async def api_delete_template(template_id: str):
         raise HTTPException(status_code=404, detail="Template not found")
     return {"message": "Template deleted successfully"}
 
+# =========================
+# ANALYTICS API (PRO FEATURE)
+# =========================
+
+def check_pro_status(current_user: dict):
+    if not current_user.get("is_pro"):
+        raise HTTPException(status_code=403, detail="upgrade_required")
+
+@app.post("/api/user/toggle-pro")
+async def api_toggle_pro(current_user: dict = Depends(get_current_user)):
+    success = toggle_user_pro_status(current_user["id"])
+    return {"message": "Pro status toggled", "success": success}
+
+@app.get("/api/analytics/overview")
+async def api_analytics_overview(current_user: dict = Depends(get_current_user)):
+    check_pro_status(current_user)
+    return get_analytics_overview(current_user["id"])
+
+@app.get("/api/analytics/most-used")
+async def api_analytics_most_used(current_user: dict = Depends(get_current_user)):
+    check_pro_status(current_user)
+    return {"prompts": get_most_used_prompts(current_user["id"])}
+
+@app.get("/api/analytics/quality-trend")
+async def api_analytics_quality_trend(range: int = 30, current_user: dict = Depends(get_current_user)):
+    check_pro_status(current_user)
+    return {"trend": get_quality_trend(current_user["id"], range)}
+
+@app.get("/api/analytics/report-card")
+async def api_analytics_report_card(current_user: dict = Depends(get_current_user)):
+    check_pro_status(current_user)
+    
+    # Gather stats
+    overview = get_analytics_overview(current_user["id"])
+    most_used = get_most_used_prompts(current_user["id"])
+    
+    # Generate narrative via AI
+    from services.gemini_service import generate_analytics_report_card
+    stats_summary = f"Total Prompts: {overview['total_prompts']}, Avg Score: {overview['average_quality_score']}, Streak: {overview['current_streak_days']} days. Top Categories: {', '.join([p['name'] for p in most_used])}"
+    
+    narrative = await generate_analytics_report_card(stats_summary)
+    
+    return {
+        "narrative": narrative,
+        "score_delta": "+5.2",  # Simulated delta
+        "most_improved_category": most_used[0]['name'] if most_used else "General",
+        "streak": overview["current_streak_days"]
+    }
+
+# =========================
+# SHARE LINK API
+# =========================
+
+class ShareRequest(BaseModel):
+    prompt_text: str
+    quality_score: int
+    category: str
+    language: str
+    author_name: Optional[str] = None
+    visibility: str = "public"
+    expires_in_days: Optional[int] = None
+
+@app.post("/api/prompts/share")
+async def api_create_share(req: ShareRequest, current_user: dict = Depends(get_current_user)):
+    # Generate unique 32+ char base62-like token
+    token = secrets.token_urlsafe(24)
+    
+    expires_at_str = None
+    if req.expires_in_days:
+        expires_at = datetime.utcnow() + timedelta(days=req.expires_in_days)
+        expires_at_str = expires_at.strftime("%Y-%m-%d %H:%M:%S")
+        
+    create_shared_prompt(
+        share_token=token,
+        prompt_text=req.prompt_text,
+        quality_score=req.quality_score,
+        category=req.category,
+        language=req.language,
+        created_by=current_user["id"],
+        author_name=req.author_name or current_user.get("email", "").split("@")[0],
+        visibility=req.visibility,
+        expires_at=expires_at_str
+    )
+    
+    return {"share_token": token, "share_url": f"/share/{token}"}
+
+@app.get("/api/share/{token}")
+async def api_get_share(token: str):
+    share = get_shared_prompt_by_token(token)
+    if not share:
+        raise HTTPException(status_code=404, detail="Link not found")
+        
+    if share.get("revoked_at"):
+        raise HTTPException(status_code=410, detail="This link has been revoked")
+        
+    if share.get("expires_at"):
+        expires_at = datetime.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S")
+        if datetime.utcnow() > expires_at:
+            raise HTTPException(status_code=410, detail="This link has expired")
+            
+    # Asynchronously increment view count or just do it here
+    increment_share_view_count(token)
+    
+    return {
+        "prompt_text": share["prompt_text"],
+        "quality_score": share["quality_score"],
+        "category": share["category"],
+        "language": share["language"],
+        "author_name": share["author_name"],
+        "created_at": share["created_at"],
+        "view_count": share["view_count"]
+    }
+
+@app.post("/api/share/{token}/save")
+async def api_save_share(token: str, current_user: dict = Depends(get_current_user)):
+    share = get_shared_prompt_by_token(token)
+    if not share or share.get("revoked_at"):
+        raise HTTPException(status_code=404, detail="Link not available")
+        
+    if share.get("expires_at"):
+        expires_at = datetime.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S")
+        if datetime.utcnow() > expires_at:
+            raise HTTPException(status_code=410, detail="This link has expired")
+
+    # Save to user's library
+    save_library_prompt(
+        name=f"Shared Prompt - {share['category']}",
+        prompt_text=share["prompt_text"],
+        tags=share["category"],
+        category=share["category"],
+        user_id=current_user["id"]
+    )
+    return {"message": "Saved to library successfully"}
+
+@app.get("/api/prompts/shares")
+async def api_list_shares(current_user: dict = Depends(get_current_user)):
+    shares = list_user_shares(current_user["id"])
+    return {"shares": shares}
+
+@app.delete("/api/share/{token}")
+async def api_revoke_share(token: str, current_user: dict = Depends(get_current_user)):
+    success = revoke_share_link(token, current_user["id"])
+    if not success:
+        raise HTTPException(status_code=403, detail="Not authorized or link not found")
+    return {"message": "Link revoked successfully"}

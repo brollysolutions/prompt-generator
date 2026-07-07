@@ -41,13 +41,13 @@ class GeminiWrapper:
                     try:
                         from google import genai
                         client = genai.Client(api_key=key)
-                        print(f"\n[DEBUG] 🚀 Attempting with Gemini API Key ending in: ...{key[-4:]}")
+                        print(f"\\n[DEBUG] Attempting with Gemini API Key ending in: ...{key[-4:]}")
                         return await client.aio.models.generate_content(**kwargs)
                     except Exception as e:
                         last_err = e
-                        print(f"[DEBUG] ⚠️ Key ...{key[-4:]} failed. Retrying next key... Error: {str(e)[:60]}")
+                        print(f"[DEBUG] Key ...{key[-4:]} failed. Retrying next key... Error: {str(e)[:60]}")
                         continue
-                print("[ERROR] ❌ ALL GEMINI KEYS EXHAUSTED!")
+                print("[ERROR] ALL GEMINI KEYS EXHAUSTED!")
                 raise last_err
                 
     @property
@@ -125,7 +125,7 @@ Return ONLY a JSON object matching this exact schema:
             }
         ]
 
-async def generate_final_prompt(user_input: str, answers: dict, questions: list = None, target_ai: str = "Universal", caveman_mode: bool = False) -> dict:
+async def generate_final_prompt(user_input: str, answers: dict, questions: list = None, target_ai: str = "Universal", tone: str = "Auto", output_format: str = "Auto", length: str = "Auto", role: str = "", caveman_mode: bool = False) -> dict:
     qa_context = ""
     if questions and len(questions) > 0:
         for idx, q in enumerate(questions):
@@ -141,12 +141,23 @@ async def generate_final_prompt(user_input: str, answers: dict, questions: list 
             qa_context += f"Q: Question {int(k)+1}\nA: {ans}\n\n"
 
     target_ai_text = f"Target AI Model: {target_ai}" if target_ai else "Target AI Model: Universal (Any LLM)"
+    
+    advanced_instructions = []
+    if tone and tone != "Auto": advanced_instructions.append(f"- Tone: {tone}")
+    if output_format and output_format != "Auto": advanced_instructions.append(f"- Output Format: {output_format}")
+    if length and length != "Auto": advanced_instructions.append(f"- Length: {length}")
+    if role and role.strip(): advanced_instructions.append(f"- Persona/Role: {role} (Override the default persona with this)")
+    
+    advanced_text = ""
+    if advanced_instructions:
+        advanced_text = "\n# Advanced User Controls (CRITICAL: MUST OBEY):\n" + "\n".join(advanced_instructions) + "\n"
+
     language_instruction = """
 ### LANGUAGE MATCHING PROTOCOL ###
 You MUST analyze the user's input and Q&A answers, and reply in the EXACT SAME language and script.
 - If the input/answers are in English, generate the prompt purely in English.
-- If the input/answers are in Teluglish (Telugu words using English letters), generate the entire prompt purely in Teluglish. Do NOT use Telugu script. Do NOT provide English translations.
-- If the input/answers are in Hinglish (Hindi words using English letters), generate the entire prompt purely in Hinglish. Do NOT use Devanagari script. Do NOT provide English translations.
+- If the input/answers are in Teluglish (Telugu words using English letters), generate the entire prompt purely in Teluglish. Do NOT use Telugu script. Do NOT provide English translations. CRITICAL: You must still write a highly structured AI prompt with all the required sections, just write the content in Teluglish. Do not just repeat the user's answers.
+- If the input/answers are in Hinglish (Hindi words using English letters), generate the entire prompt purely in Hinglish. Do NOT use Devanagari script. Do NOT provide English translations. CRITICAL: You must still write a highly structured AI prompt with all the required sections, just write the content in Hinglish. Do not just repeat the user's answers.
 """
 
     prompt = f"""You are a master AI Prompt Engineer. Your task is to synthesize the user's initial idea and their specific Q&A answers into a SINGLE, world-class execution prompt.
@@ -156,6 +167,7 @@ Original Idea: {user_input}
 {qa_context}
 # Target AI:
 {target_ai_text}
+{advanced_text}
 # Language:
 {language_instruction}
 CRITICAL INSTRUCTIONS:
@@ -169,6 +181,7 @@ CRITICAL INSTRUCTIONS:
    - # Rules & Constraints (Include 2-3 negative constraints "Do NOT...")
    - # Expected Output Format (Clear instructions on how the AI should present the final answer, e.g., bullet points, paragraphs, or a table. Do NOT ask for JSON unless the user explicitly requested it)
 4. DO NOT use markdown bolding (asterisks/stars like **text**) anywhere in the `smart_prompt` output. Use plain text formatting for lists and emphasis.
+5. CRITICAL: Ensure all newlines inside the `smart_prompt` string are properly escaped as `\\n` so the output is valid JSON.
 Return ONLY a JSON object matching this schema:
 {{
   "title": "Catchy 4-6 word title",
@@ -191,7 +204,7 @@ Return ONLY a JSON object matching this schema:
             config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         result_content = clean_json_content(response.text)
-        final_data = json.loads(result_content)
+        final_data = json.loads(result_content, strict=False)
         final_data["score"] = final_data.get("quality_score", 0)
         final_data["rewritten_prompt"] = final_data.get("smart_prompt", "")
         return final_data
@@ -338,4 +351,19 @@ Return JSON:
     except Exception as e:
         print(f"EXCEPTION in auto_categorize_prompt: {str(e)}")
         return {"name": "New Prompt", "category": "General", "tags": []}
+
+async def generate_analytics_report_card(stats_summary: str) -> str:
+    prompt = f"""You are a helpful AI analyzing a user's prompt generation statistics.
+Based on the following stats, write a 1-2 sentence encouraging narrative summarizing their progress. 
+Make it feel like a personalized "report card" reward.
+Stats: {stats_summary}"""
+    try:
+        response = await get_client().aio.models.generate_content(
+            model=model_name,
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"EXCEPTION in generate_analytics_report_card: {str(e)}")
+        return "You're doing great! Keep generating high-quality prompts."
 
