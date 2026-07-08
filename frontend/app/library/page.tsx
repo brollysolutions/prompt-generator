@@ -32,7 +32,7 @@ type LibraryPrompt = {
 
 export default function LibraryPage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, token, loading: authLoading, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsApiKey, setSettingsApiKey] = useState("");
@@ -86,10 +86,15 @@ export default function LibraryPage() {
       router.push("/login");
     }
   }, [user, authLoading, router]);
+
 const fetchLibrary = async () => {
-  if (!user) return;
+  if (!user || !token) return;
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/library?user_id=${user.id}`);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/library?user_id=${user.id}`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
     
     const data = await response.json();
     setPrompts(data.prompts || []);
@@ -108,10 +113,10 @@ const fetchLibrary = async () => {
 };
 
 useEffect(() => {
-  if (!authLoading && user) {
+  if (!authLoading && user && token) {
     fetchLibrary();
   }
-}, [user, authLoading]);
+}, [user, authLoading, token]);
 
   const handleCopy = (text: string, id: number) => {
     copyToClipboard(text).then(() => {
