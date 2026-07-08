@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Link as LinkIcon, Check, Globe, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface ShareDialogProps {
   isOpen: boolean;
@@ -66,9 +67,10 @@ export default function ShareDialog({
 
   const handleCopy = () => {
     if (shareUrl) {
-      navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyToClipboard(shareUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
     }
   };
 

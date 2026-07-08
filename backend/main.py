@@ -9,7 +9,7 @@ import os
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 import jwt
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 from google.oauth2 import id_token
@@ -84,7 +84,7 @@ app = FastAPI()
 # =========================
 # Auth Configuration
 # =========================
-JWT_SECRET = os.getenv("JWT_SECRET", "fallback_secret_for_dev_only_1234567")
+JWT_SECRET = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
 
@@ -105,7 +105,7 @@ def get_password_hash(password):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
     return encoded_jwt
@@ -123,6 +123,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
+
+async def get_optional_current_user(token: str = Depends(oauth2_scheme_optional)):
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email:
+            return get_user_by_email(email)
+    except Exception:
+        pass
+    return None
+
 # =========================
 # CORS - Robust Configuration
 # =========================
@@ -134,11 +148,21 @@ origins = [
     "http://127.0.0.1:3001",
 ]
 
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+allowed_origins = [
+    frontend_url,
+    "http://localhost:3000",
+    "http://localhost:3006",
+    "https://prompt-generator.local"
+]
+# Ensure uniqueness
+allowed_origins = list(set(allowed_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Keeping wildcard for dev, but will ensure it works
-    allow_credentials=False,
-    allow_methods=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -148,7 +172,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"message": "Internal Server Error", "detail": str(exc)},
+        content={"detail": "Internal server error"}
     )
 
 # =========================
@@ -303,8 +327,9 @@ async def test_prompt_api(data: TestPromptRequest):
 # =========================
 
 @app.post("/history")
-async def save_history_api(data: VersionRequest):
+async def save_history_api(data: VersionRequest, current_user: dict = Depends(get_optional_current_user)):
     version_id = save_prompt_version(data.session_id, data.prompt_text, data.source)
+    user_id = current_user["id"] if current_user else data.user_id
 
     # Automatically save to library if it's explicitly edited in history
     if data.source == "edited (history)":
@@ -315,7 +340,7 @@ async def save_history_api(data: VersionRequest):
                 prompt_text=data.prompt_text,
                 tags=cat_data.get("tags", []),
                 category=cat_data.get("category", "General"),
-                user_id=data.user_id
+                user_id=user_id
             )
         except Exception as e:
             logger.error(f"Failed to save edited history to library: {e}")
@@ -323,10 +348,12 @@ async def save_history_api(data: VersionRequest):
     return {"id": version_id}
 
 @app.put("/history/{version_id}")
-async def update_history_api(version_id: int, data: UpdateVersionRequest):
+async def update_history_api(version_id: int, data: UpdateVersionRequest, current_user: dict = Depends(get_optional_current_user)):
     success = update_prompt_version(version_id, data.prompt_text)
     if not success:
         return JSONResponse(status_code=404, content={"message": "Version not found"})
+    
+    user_id = current_user["id"] if current_user else data.user_id
     
     # Automatically update library if edited
     try:
@@ -336,7 +363,7 @@ async def update_history_api(version_id: int, data: UpdateVersionRequest):
             prompt_text=data.prompt_text,
             tags=cat_data.get("tags", []),
             category=cat_data.get("category", "General"),
-            user_id=data.user_id
+            user_id=user_id
         )
     except Exception as e:
         logger.error(f"Failed to save edited version to library: {e}")
@@ -344,14 +371,14 @@ async def update_history_api(version_id: int, data: UpdateVersionRequest):
     return {"message": "Updated successfully"}
 
 @app.delete("/history/{version_id}")
-async def delete_history_api(version_id: int):
+async def delete_history_api(version_id: int, current_user: dict = Depends(get_optional_current_user)):
     success = delete_version_and_library_entry(version_id)
     if not success:
         return JSONResponse(status_code=404, content={"message": "Version not found"})
     return {"message": "Deleted successfully"}
 
 @app.get("/history")
-async def get_history_api(session_id: str = None):
+async def get_history_api(session_id: str = None, current_user: dict = Depends(get_optional_current_user)):
     history = get_prompt_history(session_id)
     return {"history": history}
 
@@ -360,12 +387,12 @@ async def get_history_api(session_id: str = None):
 # =========================
 
 @app.get("/library")
-async def get_library_api(user_id: int = 0):
-    prompts = get_library_prompts(user_id)
+async def get_library_api(current_user: dict = Depends(get_current_user)):
+    prompts = get_library_prompts(current_user["id"])
     return {"prompts": prompts}
 
 @app.delete("/library/{prompt_id}")
-async def delete_library_api(prompt_id: int):
+async def delete_library_api(prompt_id: int, current_user: dict = Depends(get_current_user)):
     success = delete_library_prompt(prompt_id)
     if not success:
         return JSONResponse(status_code=404, content={"message": "Prompt not found"})
@@ -389,7 +416,7 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 async def google_auth(data: GoogleAuthRequest):
     try:
         # Verify the Google token
-        idinfo = id_token.verify_oauth2_token(data.credential, requests.Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=315360000)
+        idinfo = id_token.verify_oauth2_token(data.credential, requests.Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
         
         email = idinfo['email']
         
@@ -463,25 +490,26 @@ class CommunitySaveRequest(BaseModel):
     user_id: int
 
 @app.post("/community/publish")
-async def publish_prompt(data: CommunityPublishRequest):
-    result = publish_to_community(data.library_prompt_id, data.user_id, data.email)
+async def publish_prompt(data: CommunityPublishRequest, current_user: dict = Depends(get_current_user)):
+    result = publish_to_community(data.library_prompt_id, current_user["id"], current_user["email"])
     if not result:
         raise HTTPException(status_code=404, detail="Library prompt not found")
     return result
 
 @app.get("/community")
-async def get_community(user_id: int = 0, sort_by: str = "trending"):
+async def get_community(sort_by: str = "trending", current_user: dict = Depends(get_optional_current_user)):
+    user_id = current_user["id"] if current_user else 0
     prompts = get_community_prompts(user_id, sort_by)
     return {"prompts": prompts}
 
 @app.post("/community/upvote")
-async def upvote_prompt(data: CommunityUpvoteRequest):
-    result = upvote_community_prompt(data.user_id, data.prompt_id)
+async def upvote_prompt(data: CommunityUpvoteRequest, current_user: dict = Depends(get_current_user)):
+    result = upvote_community_prompt(current_user["id"], data.prompt_id)
     return result
 
 @app.post("/community/save")
-async def save_community_prompt(data: CommunitySaveRequest):
-    new_id = save_community_prompt_to_library(data.user_id, data.prompt_id)
+async def save_community_prompt(data: CommunitySaveRequest, current_user: dict = Depends(get_current_user)):
+    new_id = save_community_prompt_to_library(current_user["id"], data.prompt_id)
     if not new_id:
         raise HTTPException(status_code=404, detail="Community prompt not found")
     return {"message": "Saved to library", "id": new_id}
@@ -609,7 +637,7 @@ async def api_create_share(req: ShareRequest, current_user: dict = Depends(get_c
     
     expires_at_str = None
     if req.expires_in_days:
-        expires_at = datetime.utcnow() + timedelta(days=req.expires_in_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=req.expires_in_days)
         expires_at_str = expires_at.strftime("%Y-%m-%d %H:%M:%S")
         
     create_shared_prompt(
@@ -636,8 +664,8 @@ async def api_get_share(token: str):
         raise HTTPException(status_code=410, detail="This link has been revoked")
         
     if share.get("expires_at"):
-        expires_at = datetime.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S")
-        if datetime.utcnow() > expires_at:
+        expires_at = datetime.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(status_code=410, detail="This link has expired")
             
     # Asynchronously increment view count or just do it here
@@ -660,8 +688,8 @@ async def api_save_share(token: str, current_user: dict = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Link not available")
         
     if share.get("expires_at"):
-        expires_at = datetime.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S")
-        if datetime.utcnow() > expires_at:
+        expires_at = datetime.strptime(share["expires_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(status_code=410, detail="This link has expired")
 
     # Save to user's library

@@ -29,8 +29,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const savedUser = localStorage.getItem("auth_user");
 
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        const payload = JSON.parse(atob(savedToken.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          // Token expired
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_user");
+        } else {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
+        }
+      } catch (e) {
+        // Invalid token
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+      }
     }
     setLoading(false);
   }, []);

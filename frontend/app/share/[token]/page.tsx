@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { User, ShieldCheck, Eye, Download, LogIn } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { copyToClipboard } from "@/lib/clipboard";
 
 type SharedPrompt = {
   prompt_text: string;
@@ -24,6 +25,7 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -180,12 +182,16 @@ export default function SharePage() {
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-4">
             <button
               onClick={() => {
-                navigator.clipboard.writeText(prompt.prompt_text);
-                alert("Prompt copied to clipboard!");
+                if (prompt) {
+                  copyToClipboard(prompt.prompt_text).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  });
+                }
               }}
               className="w-full sm:w-auto flex-1 py-3.5 bg-white border-2 border-gray-900 text-gray-900 rounded-xl font-bold hover:bg-gray-50 transition-colors"
             >
-              Copy Text
+              {copied ? "Copied!" : "Copy Text"}
             </button>
             <button
               onClick={handleSave}

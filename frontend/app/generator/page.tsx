@@ -22,6 +22,7 @@ import ShareDialog from "@/components/ui/ShareDialog";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/context/AuthContext";
+import { copyToClipboard } from "@/lib/clipboard";
 
 type Question = {
   question: string;
@@ -49,6 +50,8 @@ type SmartPromptResult = {
   // fallback legacy fields
   final_instruction?: string;
   final_prompt?: string;
+  rewritten_prompt?: string;
+  category?: string;
 };
 
 export default function GeneratorPage() {
@@ -82,6 +85,13 @@ export default function GeneratorPage() {
   const [settingsApiProvider, setSettingsApiProvider] = useState("");
   const [settingsApiModel, setSettingsApiModel] = useState("");
   const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
+
+  // Auth protection
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   // Load configuration for settings
   useEffect(() => {
@@ -380,8 +390,8 @@ export default function GeneratorPage() {
       finalPrompt?.final_instruction ||
       finalPrompt?.final_prompt ||
       "";
-    const markdownText = "```markdown\n" + text + "\n```";
-    navigator.clipboard.writeText(markdownText).then(() => {
+    const markdownText = "```markdown\\n" + text + "\\n```";
+    copyToClipboard(markdownText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
@@ -1291,7 +1301,7 @@ export default function GeneratorPage() {
               onClick={() => setIsSettingsOpen(false)}
               style={{
                 width: "100%",
-                background: "#F3F4G6",
+                background: "#F3F4F6",
                 color: "#4B5563",
                 border: "none",
                 borderRadius: "12px",
@@ -1453,7 +1463,7 @@ export default function GeneratorPage() {
       <ShareDialog
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        promptText={finalPrompt?.prompt || finalPrompt?.smart_prompt || ""}
+        promptText={finalPrompt?.smart_prompt || finalPrompt?.final_prompt || finalPrompt?.rewritten_prompt || ""}
         qualityScore={finalPrompt?.quality_score || finalPrompt?.score || 100}
         category={finalPrompt?.category || "General"}
         language={"en"} 

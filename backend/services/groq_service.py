@@ -18,10 +18,10 @@ class GroqWrapper:
         self.keys = []
         for i in range(1, 20):
             key = os.getenv(f"GROQ_API_KEY_{i}")
-            if key: self.keys.append(key)
+            if key and key.strip(): self.keys.append(key.strip())
         if not self.keys:
             key = os.getenv("GROQ_API_KEY")
-            if key: self.keys.append(key)
+            if key and key.strip(): self.keys.append(key.strip())
         if not self.keys:
             raise ValueError("No GROQ_API_KEY found in .env")
 
@@ -43,11 +43,12 @@ class GroqWrapper:
                     try:
                         from groq import AsyncGroq
                         client = AsyncGroq(api_key=key)
-                        print(f"\n[DEBUG] Attempting with Groq API Key ending in: ...{key[-4:]}")
+                        print(f"\n[DEBUG] Attempting with Groq API Key...")
                         return await client.chat.completions.create(**kwargs)
                     except Exception as e:
                         last_err = e
-                        print(f"[DEBUG] Key ...{key[-4:]} failed (Rate Limit?). Retrying next key... Error: {str(e)[:60]}")
+                        print(f"[DEBUG] Key failed (Rate Limit?). Retrying next key... Error: {str(e)[:60]}")
+                        await asyncio.sleep(1)
                         continue
                 print("[ERROR] ALL GROQ KEYS EXHAUSTED!")
                 raise last_err
@@ -297,13 +298,7 @@ Return ONLY a JSON object matching this schema:
         )
 
         result_content = response.choices[0].message.content.strip()
-        if result_content.startswith("```json"):
-            result_content = result_content[7:]
-        if result_content.startswith("```"):
-            result_content = result_content[3:]
-        if result_content.endswith("```"):
-            result_content = result_content[:-3]
-        result_content = result_content.strip()
+        result_content = clean_json_content(result_content)
         final_data = json.loads(result_content)
         
         # Add internal tracking fields
@@ -318,8 +313,18 @@ Return ONLY a JSON object matching this schema:
         return {
             "title": "Generated Prompt (Fallback)",
             "summary": "A basic prompt generated after a system error occurred.",
-            "smart_prompt": f"Original Idea: {user_input}\n\nAdditional Details:\n{qa_context}",
-            "quality_score": 50
+            "smart_prompt": f"Original Idea: {user_input}\\n\\nAdditional Details:\\n{qa_context}",
+            "quality_score": 50,
+            "quality_breakdown": {
+                "Persona & Role": 10,
+                "Task Clarity & Logic": 10,
+                "Context & Knowledge": 10,
+                "Guardrails & Safety": 10,
+                "Structure & Formatting": 10
+            },
+            "quality_feedback": ["System encountered an error, fallback used."],
+            "score": 50,
+            "rewritten_prompt": f"Original Idea: {user_input}\\n\\nAdditional Details:\\n{qa_context}"
         }
 
 # =========================
@@ -364,13 +369,7 @@ Return ONLY a JSON object. Do not include any explanations outside the JSON.
             response_format={"type": "json_object"}
         )
         content = response.choices[0].message.content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
+        content = clean_json_content(content)
         return json.loads(content)
     except Exception as e:
         print(f"EXCEPTION in score_prompt_step1: {str(e)}")

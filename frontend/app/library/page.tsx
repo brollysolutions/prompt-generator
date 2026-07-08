@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Header from "@/components/ui/Header";
+import { copyToClipboard } from "@/lib/clipboard";
 import { Copy, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, Globe, Share } from "lucide-react";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
@@ -113,9 +114,10 @@ useEffect(() => {
 }, [user, authLoading]);
 
   const handleCopy = (text: string, id: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    copyToClipboard(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
 
   const handlePublish = async () => {

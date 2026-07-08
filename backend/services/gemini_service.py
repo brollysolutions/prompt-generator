@@ -16,10 +16,10 @@ class GeminiWrapper:
         self.keys = []
         for i in range(1, 15):
             key = os.getenv(f"GEMINI_API_KEY_{i}")
-            if key: self.keys.append(key)
+            if key and key.strip(): self.keys.append(key.strip())
         if not self.keys:
             single_key = os.getenv("GEMINI_API_KEY")
-            if single_key: self.keys.append(single_key)
+            if single_key and single_key.strip(): self.keys.append(single_key.strip())
         if not self.keys:
             raise ValueError("No GEMINI_API_KEY found in .env")
 
@@ -41,11 +41,12 @@ class GeminiWrapper:
                     try:
                         from google import genai
                         client = genai.Client(api_key=key)
-                        print(f"\\n[DEBUG] Attempting with Gemini API Key ending in: ...{key[-4:]}")
+                        print(f"\\n[DEBUG] Attempting with Gemini API Key...")
                         return await client.aio.models.generate_content(**kwargs)
                     except Exception as e:
                         last_err = e
-                        print(f"[DEBUG] Key ...{key[-4:]} failed. Retrying next key... Error: {str(e)[:60]}")
+                        print(f"[DEBUG] Key failed. Retrying next key... Error: {str(e)[:60]}")
+                        await asyncio.sleep(1)
                         continue
                 print("[ERROR] ALL GEMINI KEYS EXHAUSTED!")
                 raise last_err
@@ -213,8 +214,18 @@ Return ONLY a JSON object matching this schema:
         return {
             "title": "Generated Prompt (Fallback)",
             "summary": "A basic prompt generated after a system error occurred.",
-            "smart_prompt": f"Original Idea: {user_input}\n\nAdditional Details:\n{qa_context}",
-            "quality_score": 50
+            "smart_prompt": f"Original Idea: {user_input}\\n\\nAdditional Details:\\n{qa_context}",
+            "quality_score": 50,
+            "quality_breakdown": {
+                "Persona & Role": 10,
+                "Task Clarity & Logic": 10,
+                "Context & Knowledge": 10,
+                "Guardrails & Safety": 10,
+                "Structure & Formatting": 10
+            },
+            "quality_feedback": ["System encountered an error, fallback used."],
+            "score": 50,
+            "rewritten_prompt": f"Original Idea: {user_input}\\n\\nAdditional Details:\\n{qa_context}"
         }
 
 async def score_prompt_step1(prompt: str) -> dict:
