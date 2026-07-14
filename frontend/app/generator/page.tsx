@@ -1023,6 +1023,7 @@ export default function GeneratorPage() {
                     </div>
                   </div>
 
+                  {/* IN-APP PROMPT TESTER DISABLED FOR LIVE TESTING
                   <div
                     className="mt-8 bg-white/70 backdrop-blur-md border-2 border-[#D4AF37]/60 rounded-3xl p-5 md:p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]"
                   >
