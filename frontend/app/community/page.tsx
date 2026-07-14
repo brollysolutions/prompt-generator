@@ -32,7 +32,7 @@ type CommunityPrompt = {
 
 export default function CommunityPage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, token, loading: authLoading, logout } = useAuth();
   
   // Navigation / Profile states
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -42,14 +42,13 @@ export default function CommunityPage() {
   const [settingsApiModel, setSettingsApiModel] = useState("");
   const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
 
-  useEffect(() => {
-    if (isSettingsOpen) {
-      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
-      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
-      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
-      setIsEditingSettingsKey(false);
-    }
-  }, [isSettingsOpen]);
+  const handleOpenSettings = () => {
+    setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+    setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+    setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+    setIsEditingSettingsKey(false);
+    setIsSettingsOpen(true);
+  };
 
   const handleSaveSettingsKey = () => {
     const trimmedKey = settingsApiKey.trim();
@@ -95,7 +94,9 @@ export default function CommunityPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community?user_id=${user.id}&sort_by=${sortBy}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community?sort_by=${sortBy}`, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
       setPrompts(data.prompts || []);
     } catch (error) {
@@ -107,7 +108,10 @@ export default function CommunityPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      fetchCommunity();
+      const timer = window.setTimeout(() => {
+        void fetchCommunity();
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [user, authLoading, sortBy]);
 
@@ -129,8 +133,11 @@ export default function CommunityPage() {
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/upvote`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt_id: promptId, user_id: user.id })
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ prompt_id: promptId })
       });
       // Optionally refetch or trust the optimistic update
     } catch (error) {
@@ -145,8 +152,11 @@ export default function CommunityPage() {
       setSavingIds(prev => ({ ...prev, [promptId]: true }));
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/save`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt_id: promptId, user_id: user.id })
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ prompt_id: promptId })
       });
       
       if (response.ok) {
@@ -212,7 +222,7 @@ export default function CommunityPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <Header onOpenSettings={() => setIsSettingsOpen(true)} />
+          <Header onOpenSettings={handleOpenSettings} />
 
           {/* Full Page Background Waves */}
           <div className="bg-wave-container">
@@ -346,7 +356,7 @@ export default function CommunityPage() {
                         </div>
                         
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                          {Array.isArray(p.tags) ? p.tags.map((tag: any, idx: number) => (
+                          {Array.isArray(p.tags) ? p.tags.map((tag: string, idx: number) => (
                             <span key={idx} style={{ color: "#4b5563", fontSize: "11px", background: "rgba(243, 244, 246, 0.8)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(212, 175, 55, 0.2)" }}>
                               #{tag}
                             </span>

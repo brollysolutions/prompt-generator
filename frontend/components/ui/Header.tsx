@@ -32,6 +32,8 @@ export default function Header({ showReset = false, onOpenSettings }: { showRese
         {/* Mobile Hamburger */}
         <button
           className="md:hidden flex items-center justify-center p-2 text-black shrink-0 cursor-pointer"
+          type="button"
+          aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -50,7 +52,21 @@ export default function Header({ showReset = false, onOpenSettings }: { showRese
           {showReset && (
             <button
               onClick={() => {
-                const keysToRemove = ["userInput", "questions", "answers", "customAnswers", "finalPrompt", "targetAi", "testResponse", "internalPrompt"];
+                const keysToRemove = [
+                  "userInput",
+                  "questions",
+                  "answers",
+                  "customAnswers",
+                  "finalPrompt",
+                  "targetAi",
+                  "tone",
+                  "outputFormat",
+                  "length",
+                  "role",
+                  "testResponse",
+                  "internalPrompt",
+                  "sessionId",
+                ];
                 keysToRemove.forEach(key => localStorage.removeItem(key));
                 window.location.reload();
               }}
@@ -64,6 +80,8 @@ export default function Header({ showReset = false, onOpenSettings }: { showRese
         {/* Profile */}
         <div ref={profileRef} className="relative shrink-0 ml-auto md:ml-4 md:border-l md:border-gray-200 pl-2 md:pl-4">
           <button
+            type="button"
+            aria-label="Open profile menu"
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             className="flex items-center justify-center p-2 bg-[#D4AF37]/10 border border-[#D4AF37] rounded-full cursor-pointer text-[#AA8A27] shrink-0"
           >
@@ -127,7 +145,21 @@ export default function Header({ showReset = false, onOpenSettings }: { showRese
           {showReset && (
             <button
               onClick={() => {
-                const keysToRemove = ["userInput", "questions", "answers", "customAnswers", "finalPrompt", "targetAi", "testResponse", "internalPrompt"];
+                const keysToRemove = [
+                  "userInput",
+                  "questions",
+                  "answers",
+                  "customAnswers",
+                  "finalPrompt",
+                  "targetAi",
+                  "tone",
+                  "outputFormat",
+                  "length",
+                  "role",
+                  "testResponse",
+                  "internalPrompt",
+                  "sessionId",
+                ];
                 keysToRemove.forEach(key => localStorage.removeItem(key));
                 setIsMobileMenuOpen(false);
                 window.location.reload();

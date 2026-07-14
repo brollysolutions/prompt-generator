@@ -46,15 +46,13 @@ export default function LibraryPage() {
   const [publishMessage, setPublishMessage] = useState<{ text: string, isError: boolean } | null>(null);
   const [shareModalPrompt, setShareModalPrompt] = useState<LibraryPrompt | null>(null);
 
-  // Load configuration for settings
-  useEffect(() => {
-    if (isSettingsOpen) {
-      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
-      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
-      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
-      setIsEditingSettingsKey(false);
-    }
-  }, [isSettingsOpen]);
+  const handleOpenSettings = () => {
+    setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+    setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+    setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+    setIsEditingSettingsKey(false);
+    setIsSettingsOpen(true);
+  };
 
   const handleSaveSettingsKey = () => {
     const trimmedKey = settingsApiKey.trim();
@@ -101,7 +99,8 @@ const fetchLibrary = async () => {
     
     // Initialize published state from backend
     const publishedState: Record<number, boolean> = {};
-    (data.prompts || []).forEach((p: any) => {
+    const promptsList = (data.prompts || []) as LibraryPrompt[];
+    promptsList.forEach((p) => {
       if (p.is_published) {
         publishedState[p.id] = true;
       }
@@ -114,7 +113,10 @@ const fetchLibrary = async () => {
 
 useEffect(() => {
   if (!authLoading && user && token) {
-    fetchLibrary();
+    const timer = window.setTimeout(() => {
+      void fetchLibrary();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }
 }, [user, authLoading, token]);
 
@@ -131,7 +133,10 @@ useEffect(() => {
       setPublishingId(publishModalPrompt.id);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/publish`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           library_prompt_id: publishModalPrompt.id,
           user_id: user.id,
@@ -176,7 +181,7 @@ useEffect(() => {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <Header onOpenSettings={() => setIsSettingsOpen(true)} />
+          <Header onOpenSettings={handleOpenSettings} />
 
           {/* Full Page Background Waves */}
           <div className="bg-wave-container">
@@ -376,7 +381,7 @@ useEffect(() => {
                       </div>
                       
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                        {Array.isArray(p.tags) ? p.tags.map((tag: any, idx: number) => (
+                          {Array.isArray(p.tags) ? p.tags.map((tag: string, idx: number) => (
                           <span key={idx} style={{
                             color: "#4b5563",
                             fontSize: "12px",
@@ -767,7 +772,7 @@ useEffect(() => {
                     </div>
                   ) : (
                     <p style={{ color: "#6B7280", fontSize: "14px", margin: "0 0 24px 0", lineHeight: 1.5 }}>
-                      Are you sure you want to make the prompt <strong>"{publishModalPrompt.name}"</strong> visible to everyone? This action cannot be undone.
+                      Are you sure you want to make the prompt <strong>&quot;{publishModalPrompt.name}&quot;</strong> visible to everyone? This action cannot be undone.
                     </p>
                   )}
                   
@@ -800,7 +805,7 @@ useEffect(() => {
             qualityScore={0} // We don't have the exact score in library, send 0 to hide it
             category={shareModalPrompt?.category || ""}
             language={"en"} // Default
-            token={typeof window !== "undefined" ? localStorage.getItem("auth_token") : null}
+            token={token}
           />
         </>
       )}

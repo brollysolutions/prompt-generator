@@ -19,7 +19,7 @@ type SharedPrompt = {
 export default function SharePage() {
   const { token } = useParams();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, token: authToken, loading: authLoading } = useAuth();
   
   const [prompt, setPrompt] = useState<SharedPrompt | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +62,7 @@ export default function SharePage() {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/share/${token}/save`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${localStorage.getItem("auth_token")}`
+          ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
         }
       });
       

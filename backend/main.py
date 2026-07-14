@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, Depends, HTTPException, status
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -81,10 +81,26 @@ from database import (
 
 app = FastAPI()
 
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
+    if request.url.scheme == "https" or os.getenv("FORCE_HSTS", "false").lower() == "true":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 # =========================
 # Auth Configuration
 # =========================
 JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is required")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
 
@@ -180,38 +196,38 @@ async def global_exception_handler(request: Request, exc: Exception):
 # =========================
 
 class UserInput(BaseModel):
-    user_input: str
+    user_input: str = Field(min_length=1, max_length=4000)
 
 
 class PromptScoreRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(min_length=1, max_length=12000)
 
 class EnhancePromptRequest(BaseModel):
-    prompt: str
-    instruction: str
+    prompt: str = Field(min_length=1, max_length=12000)
+    instruction: str = Field(min_length=1, max_length=4000)
 
 class TestPromptRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(min_length=1, max_length=12000)
 
 class VersionRequest(BaseModel):
-    session_id: str
-    prompt_text: str
-    source: str
+    session_id: str = Field(min_length=1, max_length=128)
+    prompt_text: str = Field(min_length=1, max_length=20000)
+    source: str = Field(min_length=1, max_length=64)
     user_id: int = 0
 
 class UpdateVersionRequest(BaseModel):
-    prompt_text: str
+    prompt_text: str = Field(min_length=1, max_length=20000)
     user_id: int = 0
 
 class FinalPromptRequest(BaseModel):
-    user_input: str
-    answers: dict
-    questions: list = []
-    target_ai: str = ""
-    tone: str = "Auto"
-    output_format: str = "Auto"
-    length: str = "Auto"
-    role: str = ""
+    user_input: str = Field(min_length=1, max_length=4000)
+    answers: dict = Field(default_factory=dict)
+    questions: list = Field(default_factory=list)
+    target_ai: str = Field(default="", max_length=128)
+    tone: str = Field(default="Auto", max_length=64)
+    output_format: str = Field(default="Auto", max_length=64)
+    length: str = Field(default="Auto", max_length=64)
+    role: str = Field(default="", max_length=256)
     caveman_mode: bool = False
     user_id: int = 0
 
@@ -242,12 +258,13 @@ async def generate_questions_api(data: UserInput):
 
 
 @app.post("/generate-final-prompt")
-async def generate_final_prompt_api(data: FinalPromptRequest):
+async def generate_final_prompt_api(data: FinalPromptRequest, current_user: dict = Depends(get_optional_current_user)):
 
     user_input = data.user_input
     answers = data.answers
     questions = data.questions  # pass questions for proper Q&A context labeling
     target_ai = data.target_ai
+    user_id = current_user["id"] if current_user else 0
 
     if is_regional_language(user_input):
         logger.info("Detected Regional Language (Hinglish/Teluglish). Routing to Groq Llama 3.3 70B.")
@@ -279,11 +296,11 @@ async def generate_final_prompt_api(data: FinalPromptRequest):
                 prompt_text=prompt_text,
                 tags=cat_data.get("tags", []),
                 category=cat_data.get("category", "General"),
-                user_id=data.user_id
+                user_id=user_id
             )
-            if data.user_id > 0:
+            if user_id > 0:
                 record_prompt_usage(
-                    user_id=data.user_id,
+                    user_id=user_id,
                     prompt_id=None,
                     category=cat_data.get("category", "General"),
                     quality_score=result.get("quality_score", 0)
@@ -327,9 +344,9 @@ async def test_prompt_api(data: TestPromptRequest):
 # =========================
 
 @app.post("/history")
-async def save_history_api(data: VersionRequest, current_user: dict = Depends(get_optional_current_user)):
-    version_id = save_prompt_version(data.session_id, data.prompt_text, data.source)
-    user_id = current_user["id"] if current_user else data.user_id
+async def save_history_api(data: VersionRequest, current_user: dict = Depends(get_current_user)):
+    user_id = current_user["id"]
+    version_id = save_prompt_version(data.session_id, data.prompt_text, data.source, user_id)
 
     # Automatically save to library if it's explicitly edited in history
     if data.source == "edited (history)":
@@ -348,13 +365,12 @@ async def save_history_api(data: VersionRequest, current_user: dict = Depends(ge
     return {"id": version_id}
 
 @app.put("/history/{version_id}")
-async def update_history_api(version_id: int, data: UpdateVersionRequest, current_user: dict = Depends(get_optional_current_user)):
-    success = update_prompt_version(version_id, data.prompt_text)
+async def update_history_api(version_id: int, data: UpdateVersionRequest, current_user: dict = Depends(get_current_user)):
+    user_id = current_user["id"]
+    success = update_prompt_version(version_id, data.prompt_text, user_id)
     if not success:
         return JSONResponse(status_code=404, content={"message": "Version not found"})
-    
-    user_id = current_user["id"] if current_user else data.user_id
-    
+
     # Automatically update library if edited
     try:
         cat_data = await auto_categorize_prompt(data.prompt_text)
@@ -371,15 +387,15 @@ async def update_history_api(version_id: int, data: UpdateVersionRequest, curren
     return {"message": "Updated successfully"}
 
 @app.delete("/history/{version_id}")
-async def delete_history_api(version_id: int, current_user: dict = Depends(get_optional_current_user)):
-    success = delete_version_and_library_entry(version_id)
+async def delete_history_api(version_id: int, current_user: dict = Depends(get_current_user)):
+    success = delete_version_and_library_entry(version_id, current_user["id"])
     if not success:
         return JSONResponse(status_code=404, content={"message": "Version not found"})
     return {"message": "Deleted successfully"}
 
 @app.get("/history")
-async def get_history_api(session_id: str = None, current_user: dict = Depends(get_optional_current_user)):
-    history = get_prompt_history(session_id)
+async def get_history_api(session_id: str = None, current_user: dict = Depends(get_current_user)):
+    history = get_prompt_history(session_id, current_user["id"])
     return {"history": history}
 
 # =========================
@@ -393,7 +409,7 @@ async def get_library_api(current_user: dict = Depends(get_current_user)):
 
 @app.delete("/library/{prompt_id}")
 async def delete_library_api(prompt_id: int, current_user: dict = Depends(get_current_user)):
-    success = delete_library_prompt(prompt_id)
+    success = delete_library_prompt(prompt_id, current_user["id"])
     if not success:
         return JSONResponse(status_code=404, content={"message": "Prompt not found"})
     return {"message": "Deleted successfully"}
@@ -404,16 +420,18 @@ async def delete_library_api(prompt_id: int, current_user: dict = Depends(get_cu
 # =========================
 
 class AuthRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=8, max_length=128)
 
 class GoogleAuthRequest(BaseModel):
-    credential: str
+    credential: str = Field(min_length=1, max_length=8192)
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 @app.post("/auth/google")
 async def google_auth(data: GoogleAuthRequest):
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
     try:
         # Verify the Google token
         idinfo = id_token.verify_oauth2_token(data.credential, requests.Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
@@ -483,11 +501,9 @@ class CommunityPublishRequest(BaseModel):
 
 class CommunityUpvoteRequest(BaseModel):
     prompt_id: int
-    user_id: int
 
 class CommunitySaveRequest(BaseModel):
     prompt_id: int
-    user_id: int
 
 @app.post("/community/publish")
 async def publish_prompt(data: CommunityPublishRequest, current_user: dict = Depends(get_current_user)):
@@ -525,11 +541,11 @@ async def report_community_prompt(prompt_id: int):
 # =========================
 
 class TemplateRequest(BaseModel):
-    name: str
-    category: str
-    description: str
-    template_text: str
-    icon: str = "file-text"
+    name: str = Field(min_length=1, max_length=120)
+    category: str = Field(min_length=1, max_length=60)
+    description: str = Field(min_length=1, max_length=240)
+    template_text: str = Field(min_length=1, max_length=12000)
+    icon: str = Field(default="file-text", max_length=64)
 
 @app.get("/api/templates")
 async def api_get_templates(category: str = None, search: str = None):
@@ -545,6 +561,8 @@ async def api_get_template(template_id: str):
 
 @app.post("/api/templates")
 async def api_create_template(data: TemplateRequest):
+    if not allow_template_mutations():
+        raise HTTPException(status_code=403, detail="Template mutations are disabled in production")
     import uuid
     template_id = str(uuid.uuid4())
     create_template(
@@ -554,6 +572,8 @@ async def api_create_template(data: TemplateRequest):
 
 @app.put("/api/templates/{template_id}")
 async def api_update_template(template_id: str, data: TemplateRequest):
+    if not allow_template_mutations():
+        raise HTTPException(status_code=403, detail="Template mutations are disabled in production")
     success = update_template(
         template_id, data.name, data.category, data.description, data.template_text, data.icon
     )
@@ -563,6 +583,8 @@ async def api_update_template(template_id: str, data: TemplateRequest):
 
 @app.delete("/api/templates/{template_id}")
 async def api_delete_template(template_id: str):
+    if not allow_template_mutations():
+        raise HTTPException(status_code=403, detail="Template mutations are disabled in production")
     success = delete_template(template_id)
     if not success:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -576,8 +598,18 @@ def check_pro_status(current_user: dict):
     if not current_user.get("is_pro"):
         raise HTTPException(status_code=403, detail="upgrade_required")
 
+
+def allow_template_mutations() -> bool:
+    return os.getenv("ALLOW_TEMPLATE_MUTATIONS", "false").lower() == "true"
+
+
+def allow_pro_toggle() -> bool:
+    return os.getenv("ALLOW_PRO_TOGGLE", "false").lower() == "true"
+
 @app.post("/api/user/toggle-pro")
 async def api_toggle_pro(current_user: dict = Depends(get_current_user)):
+    if not allow_pro_toggle():
+        raise HTTPException(status_code=403, detail="This endpoint is disabled in production")
     success = toggle_user_pro_status(current_user["id"])
     return {"message": "Pro status toggled", "success": success}
 
@@ -622,13 +654,13 @@ async def api_analytics_report_card(current_user: dict = Depends(get_current_use
 # =========================
 
 class ShareRequest(BaseModel):
-    prompt_text: str
-    quality_score: int
-    category: str
-    language: str
-    author_name: Optional[str] = None
-    visibility: str = "public"
-    expires_in_days: Optional[int] = None
+    prompt_text: str = Field(min_length=1, max_length=20000)
+    quality_score: int = Field(ge=0, le=100)
+    category: str = Field(min_length=1, max_length=80)
+    language: str = Field(min_length=1, max_length=40)
+    author_name: Optional[str] = Field(default=None, max_length=120)
+    visibility: Literal["public", "unlisted"] = "public"
+    expires_in_days: Optional[int] = Field(default=None, ge=1, le=365)
 
 @app.post("/api/prompts/share")
 async def api_create_share(req: ShareRequest, current_user: dict = Depends(get_current_user)):

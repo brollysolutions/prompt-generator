@@ -34,7 +34,7 @@ interface HistoryItem {
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, token, loading: authLoading, logout } = useAuth();
   const [sessionId, setSessionId] = useState<string>("");
   const [promptHistory, setPromptHistory] = useState<HistoryItem[]>([]);
   const [currentPrompt, setCurrentPrompt] = useState<SmartPromptResult | null>(null);
@@ -54,15 +54,13 @@ export default function HistoryPage() {
   const [settingsApiModel, setSettingsApiModel] = useState("");
   const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
 
-  // Load configuration for settings
-  useEffect(() => {
-    if (isSettingsOpen) {
-      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
-      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
-      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
-      setIsEditingSettingsKey(false);
-    }
-  }, [isSettingsOpen]);
+  const handleOpenSettings = () => {
+    setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+    setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+    setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+    setIsEditingSettingsKey(false);
+    setIsSettingsOpen(true);
+  };
 
   const handleSaveSettingsKey = () => {
     const trimmedKey = settingsApiKey.trim();
@@ -98,7 +96,9 @@ export default function HistoryPage() {
     if (!sid) return;
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history?session_id=${sid}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history?session_id=${sid}`, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
       setPromptHistory(data.history || []);
     } catch (error) {
@@ -117,8 +117,6 @@ export default function HistoryPage() {
       
       const savedPrompt = localStorage.getItem("finalPrompt");
       
-      await fetchHistory(sId);
-      
       if (savedPrompt) {
         setCurrentPrompt(JSON.parse(savedPrompt));
       }
@@ -127,17 +125,29 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (sessionId && token) {
+      const timer = window.setTimeout(() => {
+        void fetchHistory(sessionId);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, token]);
+
   const handleSaveEdit = async (versionId: number) => {
     try {
       setIsSavingEdit(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ 
           session_id: sessionId,
           prompt_text: editBuffer,
           source: "edited (history)",
-          user_id: user?.id || 0,
         }),
       });
       if (response.ok) {
@@ -163,6 +173,7 @@ export default function HistoryPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history/${versionToDelete}`, {
         method: "DELETE",
+        headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
       });
       if (response.ok) {
         await fetchHistory();
@@ -195,12 +206,14 @@ export default function HistoryPage() {
       // Create a new version for the restore action
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ 
           session_id: sessionId,
           prompt_text: promptToRestore,
           source: "restored",
-          user_id: user?.id || 0,
         }),
       });
 
@@ -238,7 +251,7 @@ export default function HistoryPage() {
       color: "#000000",
     }}>
       {/* Header */}
-      <Header onOpenSettings={() => setIsSettingsOpen(true)} />
+      <Header onOpenSettings={handleOpenSettings} />
 
       {/* Full Page Background Waves */}
       <div className="bg-wave-container">

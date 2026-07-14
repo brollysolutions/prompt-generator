@@ -4,10 +4,38 @@ import os
 
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "prompt_scores.db"))
 
+
+def _connect():
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    conn.execute("PRAGMA busy_timeout=30000;")
+    return conn
+
+
+def _normalize_tags(tags):
+    if tags is None:
+        return []
+    if isinstance(tags, list):
+        return [str(tag).strip() for tag in tags if str(tag).strip()]
+    if isinstance(tags, str):
+        value = tags.strip()
+        if not value:
+            return []
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return [str(tag).strip() for tag in parsed if str(tag).strip()]
+            if isinstance(parsed, str):
+                return [parsed.strip()] if parsed.strip() else []
+        except json.JSONDecodeError:
+            return [value]
+    return [str(tags).strip()] if str(tags).strip() else []
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
-    cursor.execute('PRAGMA journal_mode=WAL;')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS prompt_scores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,6 +53,7 @@ def init_db():
             session_id TEXT NOT NULL,
             prompt_text TEXT NOT NULL,
             source TEXT NOT NULL,
+            user_id INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -83,6 +112,12 @@ def init_db():
         cursor.execute("ALTER TABLE library_prompts ADD COLUMN user_id INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass # Column already exists
+
+    # Migration: Add user_id to prompt_versions if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE prompt_versions ADD COLUMN user_id INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
         
     # Migration: Add is_pro to users if it doesn't exist
     try:
@@ -123,7 +158,7 @@ def init_db():
     conn.close()
 
 def create_user(email: str, hashed_password: str) -> int:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     try:
         cursor.execute('''
@@ -139,8 +174,7 @@ def create_user(email: str, hashed_password: str) -> int:
     return user_id
 
 def get_user_by_email(email: str):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
     row = cursor.fetchone()
@@ -149,7 +183,7 @@ def get_user_by_email(email: str):
     return user
 
 def save_prompt_score(original_prompt: str, final_score: int, criteria: dict, suggestions: list, rewritten_prompt: str) -> int:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO prompt_scores (
@@ -167,46 +201,46 @@ def save_prompt_score(original_prompt: str, final_score: int, criteria: dict, su
     conn.close()
     return record_id
 
-def save_prompt_version(session_id: str, prompt_text: str, source: str) -> int:
-    conn = sqlite3.connect(DB_PATH)
+def save_prompt_version(session_id: str, prompt_text: str, source: str, user_id: int = 0) -> int:
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO prompt_versions (session_id, prompt_text, source)
-        VALUES (?, ?, ?)
-    ''', (session_id, prompt_text, source))
+        INSERT INTO prompt_versions (session_id, prompt_text, source, user_id)
+        VALUES (?, ?, ?, ?)
+    ''', (session_id, prompt_text, source, user_id))
     version_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return version_id
 
-def update_prompt_version(version_id: int, prompt_text: str) -> bool:
-    conn = sqlite3.connect(DB_PATH)
+def update_prompt_version(version_id: int, prompt_text: str, user_id: int) -> bool:
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE prompt_versions
         SET prompt_text = ?, source = ?
-        WHERE id = ?
-    ''', (prompt_text, "edited (history)", version_id))
+        WHERE id = ? AND user_id = ?
+    ''', (prompt_text, "edited (history)", version_id, user_id))
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
     return rows_affected > 0
 
-def delete_prompt_version(version_id: int) -> bool:
-    conn = sqlite3.connect(DB_PATH)
+def delete_prompt_version(version_id: int, user_id: int) -> bool:
+    conn = _connect()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM prompt_versions WHERE id = ?', (version_id,))
+    cursor.execute('DELETE FROM prompt_versions WHERE id = ? AND user_id = ?', (version_id, user_id))
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
     return rows_affected > 0
 
-def delete_version_and_library_entry(version_id: int) -> bool:
-    conn = sqlite3.connect(DB_PATH)
+def delete_version_and_library_entry(version_id: int, user_id: int) -> bool:
+    conn = _connect()
     cursor = conn.cursor()
     
     # 1. Get the prompt text and source first
-    cursor.execute('SELECT prompt_text, source FROM prompt_versions WHERE id = ?', (version_id,))
+    cursor.execute('SELECT prompt_text, source FROM prompt_versions WHERE id = ? AND user_id = ?', (version_id, user_id))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -215,40 +249,53 @@ def delete_version_and_library_entry(version_id: int) -> bool:
     prompt_text, source = row[0], row[1]
     
     # 2. Delete from history
-    cursor.execute('DELETE FROM prompt_versions WHERE id = ?', (version_id,))
+    cursor.execute('DELETE FROM prompt_versions WHERE id = ? AND user_id = ?', (version_id, user_id))
     
     # 3. Delete from library where text matches, but only if it's not a restored version
     if source != 'restored':
-        cursor.execute('DELETE FROM library_prompts WHERE prompt_text = ?', (prompt_text,))
+        cursor.execute('DELETE FROM library_prompts WHERE prompt_text = ? AND user_id = ?', (prompt_text, user_id))
     
     conn.commit()
     conn.close()
     return True
 
-def delete_library_prompt(prompt_id: int) -> bool:
-    conn = sqlite3.connect(DB_PATH)
+def delete_library_prompt(prompt_id: int, user_id: int) -> bool:
+    conn = _connect()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM library_prompts WHERE id = ?', (prompt_id,))
+    cursor.execute('DELETE FROM library_prompts WHERE id = ? AND user_id = ?', (prompt_id, user_id))
     rows_affected = cursor.rowcount
     conn.commit()
     conn.close()
     return rows_affected > 0
 
-def get_prompt_history(session_id: str = None):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+def get_prompt_history(session_id: str = None, user_id: int | None = None):
+    conn = _connect()
     cursor = conn.cursor()
     
-    if session_id:
+    if session_id and user_id is not None:
         cursor.execute('''
-            SELECT id, session_id, prompt_text, source, created_at
+            SELECT id, session_id, prompt_text, source, user_id, created_at
+            FROM prompt_versions
+            WHERE session_id = ? AND user_id = ?
+            ORDER BY created_at DESC
+        ''', (session_id, user_id))
+    elif user_id is not None:
+        cursor.execute('''
+            SELECT id, session_id, prompt_text, source, user_id, created_at
+            FROM prompt_versions
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+        ''', (user_id,))
+    elif session_id:
+        cursor.execute('''
+            SELECT id, session_id, prompt_text, source, user_id, created_at
             FROM prompt_versions
             WHERE session_id = ?
             ORDER BY created_at DESC
         ''', (session_id,))
     else:
         cursor.execute('''
-            SELECT id, session_id, prompt_text, source, created_at
+            SELECT id, session_id, prompt_text, source, user_id, created_at
             FROM prompt_versions
             ORDER BY created_at DESC
         ''')
@@ -258,20 +305,20 @@ def get_prompt_history(session_id: str = None):
     return history
 
 def save_library_prompt(name: str, prompt_text: str, tags: list, category: str, user_id: int = 0) -> int:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
+    normalized_tags = _normalize_tags(tags)
     cursor.execute('''
         INSERT INTO library_prompts (name, prompt_text, tags, category, user_id)
         VALUES (?, ?, ?, ?, ?)
-    ''', (name, prompt_text, json.dumps(tags), category, user_id))
+    ''', (name, prompt_text, json.dumps(normalized_tags), category, user_id))
     prompt_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return prompt_id
 
 def get_library_prompts(user_id: int = 0):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT l.id, l.name, l.prompt_text, l.tags, l.category, l.created_at, l.user_id,
@@ -284,27 +331,27 @@ def get_library_prompts(user_id: int = 0):
     prompts = []
     for row in rows:
         d = dict(row)
-        try:
-            d['tags'] = json.loads(d['tags'])
-        except:
-            d['tags'] = []
+        d['tags'] = _normalize_tags(d.get('tags'))
         d['is_published'] = bool(d.get('is_published', 0))
         prompts.append(d)
     conn.close()
     return prompts
 
 def publish_to_community(library_prompt_id: int, author_id: int, author_email: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     
     # Check if prompt exists in library
-    cursor.execute('SELECT name, prompt_text, tags, category FROM library_prompts WHERE id = ?', (library_prompt_id,))
+    cursor.execute('SELECT name, prompt_text, tags, category, user_id FROM library_prompts WHERE id = ?', (library_prompt_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         return None
         
-    name, prompt_text, tags, category = row
+    name, prompt_text, tags, category, prompt_owner_id = row
+    if prompt_owner_id != author_id:
+        conn.close()
+        return None
     
     # Check if this user already published this exact prompt text to the community
     cursor.execute('SELECT id FROM community_prompts WHERE author_id = ? AND prompt_text = ?', (author_id, prompt_text))
@@ -324,8 +371,7 @@ def publish_to_community(library_prompt_id: int, author_id: int, author_email: s
     return {"id": new_id, "already_published": False}
 
 def get_community_prompts(user_id: int = 0, sort_by: str = "trending"):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     
     order_by_clause = "c.upvotes DESC, c.created_at DESC" if sort_by == "trending" else "c.created_at DESC"
@@ -341,17 +387,14 @@ def get_community_prompts(user_id: int = 0, sort_by: str = "trending"):
     prompts = []
     for row in rows:
         d = dict(row)
-        try:
-            d['tags'] = json.loads(d['tags'])
-        except:
-            d['tags'] = []
+        d['tags'] = _normalize_tags(d.get('tags'))
         d['has_upvoted'] = bool(d['has_upvoted'])
         prompts.append(d)
     conn.close()
     return prompts
 
 def upvote_community_prompt(user_id: int, prompt_id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     
     # Check if already upvoted
@@ -379,7 +422,7 @@ def upvote_community_prompt(user_id: int, prompt_id: int):
     return {"upvoted": upvoted, "upvotes": new_upvotes}
 
 def save_community_prompt_to_library(user_id: int, community_prompt_id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     
     cursor.execute('SELECT name, prompt_text, tags, category FROM community_prompts WHERE id = ?', (community_prompt_id,))
@@ -389,12 +432,13 @@ def save_community_prompt_to_library(user_id: int, community_prompt_id: int):
         return None
         
     name, prompt_text, tags, category = row
+    normalized_tags = _normalize_tags(tags)
     
     # Save it to user's library using existing JSON tags string
     cursor.execute('''
         INSERT INTO library_prompts (name, prompt_text, tags, category, user_id)
         VALUES (?, ?, ?, ?, ?)
-    ''', (name + " (Remix)", prompt_text, tags, category, user_id))
+    ''', (name + " (Remix)", prompt_text, json.dumps(normalized_tags), category, user_id))
     
     new_id = cursor.lastrowid
     conn.commit()
@@ -402,7 +446,7 @@ def save_community_prompt_to_library(user_id: int, community_prompt_id: int):
     return new_id
 
 def seed_templates():
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM templates')
     count = cursor.fetchone()[0]
@@ -446,8 +490,7 @@ def seed_templates():
     conn.close()
 
 def get_templates(category: str = None, search: str = None):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     
     query = 'SELECT * FROM templates WHERE 1=1'
@@ -470,8 +513,7 @@ def get_templates(category: str = None, search: str = None):
     return templates
 
 def get_template_by_id(template_id: str):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM templates WHERE id = ?', (template_id,))
     row = cursor.fetchone()
@@ -480,7 +522,7 @@ def get_template_by_id(template_id: str):
     return template
 
 def create_template(template_id: str, name: str, category: str, description: str, template_text: str, icon: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO templates (id, name, category, description, template_text, icon)
@@ -491,7 +533,7 @@ def create_template(template_id: str, name: str, category: str, description: str
     return template_id
 
 def update_template(template_id: str, name: str, category: str, description: str, template_text: str, icon: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE templates SET name=?, category=?, description=?, template_text=?, icon=?
@@ -503,7 +545,7 @@ def update_template(template_id: str, name: str, category: str, description: str
     return rows_affected > 0
 
 def delete_template(template_id: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM templates WHERE id=?', (template_id,))
     rows_affected = cursor.rowcount
@@ -516,7 +558,7 @@ def delete_template(template_id: str):
 # =========================
 
 def toggle_user_pro_status(user_id: int) -> bool:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('SELECT is_pro FROM users WHERE id = ?', (user_id,))
     row = cursor.fetchone()
@@ -530,7 +572,7 @@ def toggle_user_pro_status(user_id: int) -> bool:
     return True
 
 def record_prompt_usage(user_id: int, prompt_id: str, category: str, quality_score: float):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO prompt_usage_events (user_id, prompt_id, category, quality_score)
@@ -540,7 +582,7 @@ def record_prompt_usage(user_id: int, prompt_id: str, category: str, quality_sco
     conn.close()
 
 def get_analytics_overview(user_id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*), AVG(quality_score) FROM prompt_usage_events WHERE user_id = ?', (user_id,))
     row = cursor.fetchone()
@@ -580,8 +622,7 @@ def get_analytics_overview(user_id: int):
     }
 
 def get_most_used_prompts(user_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT category as name, COUNT(*) as usage_count 
@@ -596,8 +637,7 @@ def get_most_used_prompts(user_id: int):
     return [dict(r) for r in rows]
 
 def get_quality_trend(user_id: int, days: int = 30):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute(f'''
         SELECT DATE(created_at) as date, AVG(quality_score) as average_score
@@ -615,7 +655,7 @@ def get_quality_trend(user_id: int, days: int = 30):
 # =======================
 
 def create_shared_prompt(share_token: str, prompt_text: str, quality_score: int, category: str, language: str, created_by: int, author_name: str, visibility: str = 'public', expires_at: str = None) -> int:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO shared_prompts (share_token, prompt_text, quality_score, category, language, created_by, author_name, visibility, expires_at)
@@ -627,8 +667,7 @@ def create_shared_prompt(share_token: str, prompt_text: str, quality_score: int,
     return record_id
 
 def get_shared_prompt_by_token(share_token: str):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT * FROM shared_prompts 
@@ -639,7 +678,7 @@ def get_shared_prompt_by_token(share_token: str):
     return dict(row) if row else None
 
 def increment_share_view_count(share_token: str):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE shared_prompts 
@@ -650,8 +689,7 @@ def increment_share_view_count(share_token: str):
     conn.close()
 
 def list_user_shares(user_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         SELECT * FROM shared_prompts 
@@ -663,7 +701,7 @@ def list_user_shares(user_id: int):
     return [dict(row) for row in rows]
 
 def revoke_share_link(share_token: str, user_id: int) -> bool:
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE shared_prompts 

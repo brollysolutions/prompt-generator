@@ -20,8 +20,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,6 +31,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
   return (
     <html
       lang="en"
@@ -40,11 +40,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col overflow-x-hidden w-full max-w-[100vw]">
         <AuthProvider>
-          <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
-            <TooltipProvider>
-              {children}
-            </TooltipProvider>
-          </GoogleOAuthProvider>
+          {googleClientId ? (
+            <GoogleOAuthProvider clientId={googleClientId}>
+              <TooltipProvider>{children}</TooltipProvider>
+            </GoogleOAuthProvider>
+          ) : (
+            <TooltipProvider>{children}</TooltipProvider>
+          )}
         </AuthProvider>
       </body>
     </html>

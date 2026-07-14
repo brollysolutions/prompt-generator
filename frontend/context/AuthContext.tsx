@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -18,6 +18,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -25,27 +37,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("auth_token");
-    const savedUser = localStorage.getItem("auth_user");
-
-    if (savedToken && savedUser) {
+    const timer = window.setTimeout(() => {
       try {
-        const payload = JSON.parse(atob(savedToken.split('.')[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          // Token expired
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("auth_user");
-        } else {
-          setToken(savedToken);
-          setUser(JSON.parse(savedUser));
+        const savedToken = localStorage.getItem("auth_token");
+        const savedUser = localStorage.getItem("auth_user");
+
+        if (savedToken && savedUser) {
+          const payload = decodeJwtPayload(savedToken);
+          if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("auth_user");
+          } else {
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
+          }
         }
-      } catch (e) {
-        // Invalid token
+      } catch {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const login = (newToken: string, newUser: User) => {

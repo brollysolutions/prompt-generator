@@ -69,7 +69,6 @@ export default function SignupPage() {
     setError("");
 
     try {
-      console.log("Starting signup for:", email);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
@@ -81,10 +80,8 @@ export default function SignupPage() {
       });
       
       clearTimeout(timeoutId);
-      console.log("Response status:", response.status);
 
       const data = await response.json();
-      console.log("Response data:", data);
 
       if (response.ok) {
         login(data.access_token, { id: data.user_id, email: data.email });

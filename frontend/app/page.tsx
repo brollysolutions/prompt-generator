@@ -57,7 +57,7 @@ export default function Home() {
           className="mt-6 flex flex-col items-center gap-6"
         >
           <p className="max-w-2xl text-[#8A7322] text-lg md:text-2xl font-medium drop-shadow-[0_0_15px_rgba(212,175,55,0.2)] px-4">
-            Describe your idea → Answer AI questions → Get a professional, copy-ready prompt for any AI tool.
+            Describe your idea -&gt; Answer AI questions -&gt; Get a professional, copy-ready prompt for any AI tool.
           </p>
           <div className="mt-8">
             <GradientButton />
@@ -132,3 +132,5 @@ export default function Home() {
     </div>
   );
 }
+
+

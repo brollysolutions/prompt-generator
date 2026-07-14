@@ -56,7 +56,7 @@ type SmartPromptResult = {
 
 export default function GeneratorPage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, token, loading: authLoading, logout } = useAuth();
   const [userInput, setUserInput] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: string | string[] }>({});
@@ -94,14 +94,13 @@ export default function GeneratorPage() {
   }, [user, authLoading, router]);
 
   // Load configuration for settings
-  useEffect(() => {
-    if (isSettingsOpen) {
-      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
-      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
-      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
-      setIsEditingSettingsKey(false);
-    }
-  }, [isSettingsOpen]);
+  const handleOpenSettings = () => {
+    setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+    setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+    setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+    setIsEditingSettingsKey(false);
+    setIsSettingsOpen(true);
+  };
 
   const handleSaveSettingsKey = () => {
     const trimmedKey = settingsApiKey.trim();
@@ -228,7 +227,10 @@ export default function GeneratorPage() {
       setTestResponse(null);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/test-prompt`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ prompt: text }),
       });
       const data = await response.json();
@@ -253,7 +255,10 @@ export default function GeneratorPage() {
       setCustomAnswers({});
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-questions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ user_input: userInput }),
       });
       const data = await response.json();
@@ -301,19 +306,21 @@ export default function GeneratorPage() {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-final-prompt`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_input: userInput,
-          answers: processedAnswers,
-          questions,
-          target_ai: targetAi,
-          tone: tone,
-          output_format: outputFormat,
-          length: length,
-          role: role,
-          internal_prompt: internalPrompt,
-          user_id: user?.id || 0,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+          body: JSON.stringify({
+            user_input: userInput,
+            answers: processedAnswers,
+            questions,
+            target_ai: targetAi,
+            tone: tone,
+            output_format: outputFormat,
+            length: length,
+            role: role,
+            internal_prompt: internalPrompt,
+          }),
       });
       const data = await response.json();
       
@@ -323,12 +330,14 @@ export default function GeneratorPage() {
       try {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             session_id: sessionId,
             prompt_text: promptText,
             source: "generated",
-            user_id: user?.id || 0,
           }),
         });
       } catch (historyError) {
@@ -337,11 +346,14 @@ export default function GeneratorPage() {
 
       // Auto-score the generated prompt
       try {
-        const scoreResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/score-prompt`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: promptText }),
-        });
+      const scoreResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/score-prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ prompt: promptText }),
+      });
         const fullScoreData = await scoreResponse.json();
         const scoreData = {
           quality_score: fullScoreData.score,
@@ -410,7 +422,7 @@ export default function GeneratorPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <Header showReset={true} onOpenSettings={() => setIsSettingsOpen(true)} />
+          <Header showReset={true} onOpenSettings={handleOpenSettings} />
 
           {/* Full Page Background Waves */}
           <div className="bg-wave-container">
@@ -1467,7 +1479,7 @@ export default function GeneratorPage() {
         qualityScore={finalPrompt?.quality_score || finalPrompt?.score || 100}
         category={finalPrompt?.category || "General"}
         language={"en"} 
-        token={typeof window !== "undefined" ? localStorage.getItem("auth_token") : null}
+        token={token}
       />
   </div>
   );
