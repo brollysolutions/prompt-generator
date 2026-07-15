@@ -22,6 +22,10 @@ class GeminiWrapper:
             if single_key and single_key.strip(): self.keys.append(single_key.strip())
         if not self.keys:
             raise ValueError("No GEMINI_API_KEY found in .env")
+            
+        self.clients = {}
+        for key in self.keys:
+            self.clients[key] = genai.Client(api_key=key)
 
     class Aio:
         def __init__(self, parent):
@@ -39,8 +43,7 @@ class GeminiWrapper:
                 last_err = None
                 for key in keys:
                     try:
-                        from google import genai
-                        client = genai.Client(api_key=key)
+                        client = self.parent.clients[key]
                         print(f"\\n[DEBUG] Attempting with Gemini API Key...")
                         return await client.aio.models.generate_content(**kwargs)
                     except Exception as e:
