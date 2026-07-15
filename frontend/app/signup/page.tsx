@@ -34,7 +34,7 @@ export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     setLoading(true);
     setError("");
     try {
@@ -91,9 +91,10 @@ export default function SignupPage() {
       } else {
         setError(data.detail || "Failed to create account");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Signup error:", err);
-      if (err.name === 'AbortError') {
+      const error = err as { name?: string };
+      if (error.name === 'AbortError') {
         setError("Request timed out. Is the backend running and responding?");
       } else {
         setError("Failed to connect to the server. Is the backend running?");

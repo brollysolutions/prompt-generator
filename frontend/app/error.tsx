@@ -32,7 +32,7 @@ export default function ErrorBoundary({
 
         <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
         <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-          We encountered an unexpected error. Don't worry, our team has been notified. 
+          We encountered an unexpected error. Don&apos;t worry, our team has been notified. 
           You can try again or return to the homepage.
         </p>
 

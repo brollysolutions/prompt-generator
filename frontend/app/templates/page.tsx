@@ -31,14 +31,13 @@ export default function TemplatesPage() {
   const [settingsApiModel, setSettingsApiModel] = useState("");
   const [isEditingSettingsKey, setIsEditingSettingsKey] = useState(false);
 
-  useEffect(() => {
-    if (isSettingsOpen) {
-      setSettingsApiKey(localStorage.getItem("user_api_key") || "");
-      setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
-      setSettingsApiModel(localStorage.getItem("user_api_model") || "");
-      setIsEditingSettingsKey(false);
-    }
-  }, [isSettingsOpen]);
+  const handleOpenSettings = () => {
+    setSettingsApiKey(localStorage.getItem("user_api_key") || "");
+    setSettingsApiProvider(localStorage.getItem("user_api_provider") || "");
+    setSettingsApiModel(localStorage.getItem("user_api_model") || "");
+    setIsEditingSettingsKey(false);
+    setIsSettingsOpen(true);
+  };
 
   const handleSaveSettingsKey = () => {
     const trimmedKey = settingsApiKey.trim();
@@ -87,7 +86,7 @@ export default function TemplatesPage() {
       ) : !user ? null : (
         <>
           {/* Header */}
-          <Header onOpenSettings={() => setIsSettingsOpen(true)} />
+          <Header onOpenSettings={handleOpenSettings} />
 
           {/* Full Page Background Waves */}
           <div className="bg-wave-container">
