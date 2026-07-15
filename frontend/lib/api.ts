@@ -5,9 +5,10 @@ export const getApiUrl = () => {
   // Debug log to help troubleshoot in production console
   if (typeof window !== "undefined") {
     // Only log once to avoid clutter
-    if (!(window as any)._api_logged) {
+    const win = window as unknown as { _api_logged?: boolean };
+    if (!win._api_logged) {
       console.log("🚀 Smart Prompt Generator API initialized with:", baseUrl);
-      (window as any)._api_logged = true;
+      win._api_logged = true;
     }
   }
   

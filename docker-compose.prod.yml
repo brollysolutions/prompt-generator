@@ -24,6 +24,7 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://brollysolutions.in/prompt_generator/api}
         - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        - USE_BASE_PATH=true
     ports:
       - "3006:3000"
     environment:

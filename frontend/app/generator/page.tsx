@@ -1066,7 +1066,6 @@ export default function GeneratorPage() {
                       </motion.div>
                     )}
                   </div>
-                  */}
                 </motion.div>
               )}
             </motion.div>

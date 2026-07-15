@@ -64,7 +64,7 @@ export default function AnalyticsPage() {
     fetchData();
   }, [user, authLoading, trendRange]);
 
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true);
     try {
       const overviewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/overview`, {
@@ -98,7 +98,7 @@ export default function AnalyticsPage() {
       console.error("Failed to fetch analytics:", error);
     }
     setLoading(false);
-  };
+  }
 
   const handleTogglePro = async () => {
     try {
@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
                       Your Improvement Report Card
                     </h2>
                     <p className="text-gray-800 text-lg md:text-xl font-medium leading-relaxed">
-                      "{reportCard.narrative || "Keep generating prompts to receive your personalized insights!"}"
+                      &quot;{reportCard.narrative || "Keep generating prompts to receive your personalized insights!"}&quot;
                     </p>
                   </div>
                   <div className="flex gap-4 shrink-0 bg-white/50 p-4 rounded-2xl border border-[#D4AF37]/20">
