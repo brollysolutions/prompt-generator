@@ -1023,9 +1023,15 @@ export default function GeneratorPage() {
                     </div>
                   </div>
 
-                  <div
-                    className="mt-8 bg-white/70 backdrop-blur-md border-2 border-[#D4AF37]/60 rounded-3xl p-5 md:p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]"
-                  >
+                  <div style={{
+                    marginTop: "30px",
+                    background: "rgba(255, 255, 255, 0.7)",
+                    backdropFilter: "blur(12px)",
+                    border: "1px solid rgba(212, 175, 55, 0.5)",
+                    borderRadius: "24px",
+                    padding: "32px",
+                    boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
+                  }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                       <Play size={24} fill="#000000" />
                       <h2 style={{ color: "#000000", margin: 0, fontSize: "22px", fontWeight: 700 }}>Test Prompt</h2>
@@ -1043,25 +1049,20 @@ export default function GeneratorPage() {
                         id="test-response-container" 
                         style={{ 
                           marginTop: "24px", 
-                          padding: "24px",
-                          background: "rgba(243, 244, 246, 0.5)",
+                          padding: "20px",
+                          background: "rgba(249, 250, 251, 0.6)",
                           borderRadius: "16px",
-                          border: "1px solid rgba(212, 175, 55, 0.3)",
-                          color: "#111827",
-                          lineHeight: 1.8,
-                          fontSize: "16px",
-                          fontFamily: "'Georgia', 'Times New Roman', serif",
-                          position: "relative",
-                          overflow: "visible"
+                          border: "1px dashed #D4AF37",
+                          color: "#374151",
+                          lineHeight: 1.6,
+                          fontSize: "15px"
                         }}
                       >
-                        <div style={{ position: "relative", zIndex: 1 }}>
-                          <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "20px", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>AI Strategic Response</div>
-                          <div className="markdown-content overflow-x-auto overflow-y-hidden max-w-full">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {testResponse}
-                            </ReactMarkdown>
-                          </div>
+                        <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "10px", fontSize: "13px", textTransform: "uppercase" }}>AI Response</div>
+                        <div className="markdown-content">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {testResponse}
+                          </ReactMarkdown>
                         </div>
                       </motion.div>
                     )}
