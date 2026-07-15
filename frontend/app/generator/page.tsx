@@ -18,6 +18,7 @@ import Link from "next/link";
 import Header from "@/components/ui/Header";
 import { GetStartedButton } from "@/components/ui/get-started-button";
 import ShareDialog from "@/components/ui/ShareDialog";
+import "./generator.css";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -1023,10 +1024,15 @@ export default function GeneratorPage() {
                     </div>
                   </div>
 
-                  {/* IN-APP PROMPT TESTER DISABLED FOR LIVE TESTING
-                  <div
-                    className="mt-8 bg-white/70 backdrop-blur-md border-2 border-[#D4AF37]/60 rounded-3xl p-5 md:p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]"
-                  >
+                  <div style={{
+                    marginTop: "30px",
+                    background: "rgba(255, 255, 255, 0.7)",
+                    backdropFilter: "blur(12px)",
+                    border: "1px solid rgba(212, 175, 55, 0.5)",
+                    borderRadius: "24px",
+                    padding: "32px",
+                    boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
+                  }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                       <Play size={24} fill="#000000" />
                       <h2 style={{ color: "#000000", margin: 0, fontSize: "22px", fontWeight: 700 }}>Test Prompt</h2>
@@ -1044,25 +1050,20 @@ export default function GeneratorPage() {
                         id="test-response-container" 
                         style={{ 
                           marginTop: "24px", 
-                          padding: "24px",
-                          background: "rgba(243, 244, 246, 0.5)",
+                          padding: "20px",
+                          background: "rgba(249, 250, 251, 0.6)",
                           borderRadius: "16px",
-                          border: "1px solid rgba(212, 175, 55, 0.3)",
-                          color: "#111827",
-                          lineHeight: 1.8,
-                          fontSize: "16px",
-                          fontFamily: "'Georgia', 'Times New Roman', serif",
-                          position: "relative",
-                          overflow: "visible"
+                          border: "1px dashed #D4AF37",
+                          color: "#374151",
+                          lineHeight: 1.6,
+                          fontSize: "15px"
                         }}
                       >
-                        <div style={{ position: "relative", zIndex: 1 }}>
-                          <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "20px", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>AI Strategic Response</div>
-                          <div className="markdown-content overflow-x-auto overflow-y-hidden max-w-full">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {testResponse}
-                            </ReactMarkdown>
-                          </div>
+                        <div style={{ fontWeight: 700, color: "#D4AF37", marginBottom: "10px", fontSize: "13px", textTransform: "uppercase" }}>AI Response</div>
+                        <div className="markdown-content">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {testResponse}
+                          </ReactMarkdown>
                         </div>
                       </motion.div>
                     )}
@@ -1334,145 +1335,6 @@ export default function GeneratorPage() {
       )}
       </AnimatePresence>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 8px; height: 0px; }
-        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
-        .scrollbar-hide::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
-        .scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
-        body { background: #F3F3F3 !important; overflow-x: hidden; }
-
-        .bg-wave-container {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 1;
-          background: #F3F3F3;
-          overflow: hidden;
-        }
-
-        .waves {
-          position: absolute;
-          bottom: 0;
-          width: 100%;
-          height: 100vh;
-          min-height: 100vh;
-        }
-
-        .parallax > use {
-          animation: move-forever 25s cubic-bezier(.55,.5,.45,.5)     infinite;
-        }
-        .parallax > use:nth-child(1) {
-          animation-delay: -2s;
-          animation-duration: 7s;
-          fill: rgba(255, 201, 0, 0.4);
-        }
-        .parallax > use:nth-child(2) {
-          animation-delay: -3s;
-          animation-duration: 10s;
-          fill: rgba(255, 225, 0, 0.3);
-        }
-        .parallax > use:nth-child(3) {
-          animation-delay: -4s;
-          animation-duration: 13s;
-          fill: rgba(254, 186, 23, 0.2);
-        }
-        .parallax > use:nth-child(4) {
-          animation-delay: -5s;
-          animation-duration: 20s;
-          fill: #F3F4F4;
-        }
-        @keyframes move-forever {
-          0% {
-           transform: translate3d(-90px,0,0);
-          }
-          100% { 
-            transform: translate3d(85px,0,0);
-          }
-        }
-
-        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
-          color: #000000;
-          margin-top: 24px;
-          margin-bottom: 12px;
-          font-weight: 800;
-        }
-        .markdown-content h1 { font-size: 1.5rem; border-bottom: 2px solid #D4AF37; padding-bottom: 8px; }
-        .markdown-content h2 { font-size: 1.25rem; }
-        .markdown-content h3 { font-size: 1.1rem; }
-        .markdown-content p { margin-bottom: 16px; line-height: 1.8; }
-        .markdown-content code {
-          background: #f3f4f6;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-family: 'JetBrains Mono', 'Fira Code', monospace;
-          font-size: 0.9em;
-          color: #D4AF37;
-        }
-        .markdown-content pre {
-          background: #F3F4F4;
-          color: #000000;
-          padding: 20px;
-          border-radius: 12px;
-          white-space: pre-wrap;
-          word-wrap: break-word;
-          margin-bottom: 20px;
-          border-left: 4px solid #D4AF37;
-        }
-        .markdown-content pre code {
-          background: transparent;
-          padding: 0;
-          color: inherit;
-        }
-        .markdown-content ul, .markdown-content ol {
-          margin-bottom: 16px;
-          padding-left: 24px;
-        }
-        .markdown-content li {
-          margin-bottom: 8px;
-        }
-        .markdown-content blockquote {
-          border-left: 4px solid #D4AF37;
-          padding-left: 16px;
-          font-style: italic;
-          color: #6b7280;
-          margin-bottom: 16px;
-        }
-        .markdown-content table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 24px 0;
-          font-family: 'Georgia', serif;
-        }
-        .markdown-content th {
-          font-weight: 700;
-          color: #000;
-          text-align: left;
-          padding: 12px 8px;
-          border-bottom: 2px solid #D4AF37;
-        }
-        .markdown-content td {
-          padding: 16px 8px;
-          vertical-align: top;
-          border-bottom: 1px solid #F3F4F6;
-        }
-        .markdown-content tr td:first-child {
-          font-weight: 700;
-          color: #000;
-        }
-        .markdown-content input[type="checkbox"] {
-          accent-color: #10b981;
-          width: 18px;
-          height: 18px;
-          margin-right: 8px;
-          vertical-align: middle;
-          cursor: default;
-        }
-      `}</style>
-      
       <ShareDialog
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
