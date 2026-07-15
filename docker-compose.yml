@@ -8,7 +8,7 @@ services:
     volumes:
       - sqlite_data:/app/data
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       - DB_PATH=/app/data/prompt_scores.db
     restart: always

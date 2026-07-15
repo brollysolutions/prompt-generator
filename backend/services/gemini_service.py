@@ -7,7 +7,7 @@ from google.genai import types
 from dotenv import load_dotenv
 from database import save_prompt_score
 
-load_dotenv(override=True)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"), override=True)
 
 import random
 
