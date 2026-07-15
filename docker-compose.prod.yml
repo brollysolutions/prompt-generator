@@ -7,6 +7,8 @@ services:
       - "8006:8000"
     volumes:
       - sqlite_data:/app/data
+    env_file:
+      - .env
     environment:
       - DB_PATH=/app/data/prompt_scores.db
       - JWT_SECRET=${JWT_SECRET}
@@ -27,6 +29,8 @@ services:
         - USE_BASE_PATH=true
     ports:
       - "3006:3000"
+    env_file:
+      - .env
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://brollysolutions.in/prompt_generator/api}
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}

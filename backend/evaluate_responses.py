@@ -4,7 +4,7 @@ import os
 from groq import Groq
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 BASE_URL = "http://127.0.0.1:8000"
