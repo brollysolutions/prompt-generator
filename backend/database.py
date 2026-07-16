@@ -165,6 +165,15 @@ def init_db():
             )
         ''')
 
+        # De-duplicate templates by name (keep the earliest row), then enforce a
+        # UNIQUE(name) constraint. This self-heals a DB that was double-seeded by
+        # concurrent workers on first boot, and prevents it from recurring.
+        cursor.execute(
+            'DELETE FROM templates WHERE rowid NOT IN '
+            '(SELECT MIN(rowid) FROM templates GROUP BY name)'
+        )
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_name ON templates(name)')
+
         # Indexes on hot query columns (all were full table scans before).
         # Additive and idempotent — safe to run on every boot.
         index_statements = [
@@ -510,8 +519,10 @@ def seed_templates():
                 (str(uuid.uuid4()), "Pandas Data Cleaning", "Data Analysis", "Clean missing values and parse dates", "I need a Python pandas script to clean a dataset containing missing values, parse dates, and generate a summary report. Input columns: {columns}.", "bar-chart"),
                 (str(uuid.uuid4()), "Data Visualization with Matplotlib", "Data Analysis", "Generate charts and graphs", "Write a Python script using matplotlib and seaborn to visualize {data_description}. Create a bar chart comparing {x_axis} and {y_axis}, and include a customized title and legend.", "bar-chart")
             ]
+            # INSERT OR IGNORE + the UNIQUE(name) index makes seeding safe even if
+            # two workers race on a fresh DB — the second insert of a name is ignored.
             cursor.executemany('''
-                INSERT INTO templates (id, name, category, description, template_text, icon)
+                INSERT OR IGNORE INTO templates (id, name, category, description, template_text, icon)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', templates)
             conn.commit()
