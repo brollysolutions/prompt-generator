@@ -16,6 +16,10 @@ from passlib.context import CryptContext
 from dotenv import load_dotenv
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
@@ -27,12 +31,13 @@ from services.groq_service import (
     generate_questions,
     process_prompt_scoring,
     enhance_prompt_text,
-    test_generated_prompt,
+    test_generated_prompt as groq_test_generated_prompt,
     auto_categorize_prompt,
     generate_final_prompt as groq_generate_final_prompt
 )
 from services.gemini_service import (
-    generate_final_prompt as gemini_generate_final_prompt
+    generate_final_prompt as gemini_generate_final_prompt,
+    test_generated_prompt as gemini_test_generated_prompt
 )
 import re
 
@@ -82,6 +87,30 @@ from database import (
 )
 
 app = FastAPI(root_path="/prompt_generator/api")
+
+# =========================
+# Rate limiting (slowapi)
+# =========================
+# Keyed by client IP (X-Forwarded-For aware via ProxyHeadersMiddleware). Protects
+# auth and the paid-LLM endpoints from abuse/cost-drain. Limits are generous enough
+# not to affect normal interactive use. Override the default via RATE_LIMIT_DEFAULT.
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[os.getenv("RATE_LIMIT_DEFAULT", "120/minute")],
+    enabled=os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true",
+)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please slow down and try again shortly."},
+    )
+
+
+app.add_middleware(SlowAPIMiddleware)
 
 # Add ProxyHeadersMiddleware to trust X-Forwarded-Proto headers from proxy
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
@@ -161,14 +190,6 @@ async def get_optional_current_user(token: str = Depends(oauth2_scheme_optional)
 # =========================
 # CORS - Robust Configuration
 # =========================
-
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-    "https://brollysolutions.in",
-]
 
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 allowed_origins = [
@@ -260,7 +281,8 @@ def health():
 # =========================
 
 @app.post("/generate-questions")
-async def generate_questions_api(data: UserInput):
+@limiter.limit(os.getenv("RATE_LIMIT_LLM", "20/minute"))
+async def generate_questions_api(request: Request, data: UserInput):
 
     # Step 1: Generate questions based on user input
     questions = await generate_questions(data.user_input)
@@ -271,7 +293,8 @@ async def generate_questions_api(data: UserInput):
 
 
 @app.post("/generate-final-prompt")
-async def generate_final_prompt_api(data: FinalPromptRequest, current_user: dict = Depends(get_optional_current_user)):
+@limiter.limit(os.getenv("RATE_LIMIT_LLM", "20/minute"))
+async def generate_final_prompt_api(request: Request, data: FinalPromptRequest, current_user: dict = Depends(get_optional_current_user)):
 
     user_input = data.user_input
     answers = data.answers
@@ -328,7 +351,8 @@ async def generate_final_prompt_api(data: FinalPromptRequest, current_user: dict
 # =========================
 
 @app.post("/score-prompt")
-async def score_prompt_api(data: PromptScoreRequest):
+@limiter.limit(os.getenv("RATE_LIMIT_LLM", "20/minute"))
+async def score_prompt_api(request: Request, data: PromptScoreRequest):
     result = await process_prompt_scoring(data.prompt)
     return result
 
@@ -337,7 +361,8 @@ async def score_prompt_api(data: PromptScoreRequest):
 # =========================
 
 @app.post("/enhance-prompt")
-async def enhance_prompt_api(data: EnhancePromptRequest):
+@limiter.limit(os.getenv("RATE_LIMIT_LLM", "20/minute"))
+async def enhance_prompt_api(request: Request, data: EnhancePromptRequest):
     enhanced_text = await enhance_prompt_text(data.prompt, data.instruction)
     return {"enhanced_prompt": enhanced_text}
 
@@ -346,8 +371,14 @@ async def enhance_prompt_api(data: EnhancePromptRequest):
 # =========================
 
 @app.post("/test-prompt")
-async def test_prompt_api(data: TestPromptRequest):
-    response_text = await test_generated_prompt(data.prompt)
+@limiter.limit(os.getenv("RATE_LIMIT_LLM", "20/minute"))
+async def test_prompt_api(request: Request, data: TestPromptRequest):
+    # Route to the same provider the prompt was authored for: regional languages
+    # (Hinglish/Teluglish) -> Groq Llama; English -> Gemini (higher fidelity).
+    if is_regional_language(data.prompt):
+        response_text = await groq_test_generated_prompt(data.prompt)
+    else:
+        response_text = await gemini_test_generated_prompt(data.prompt)
     return {
         "response": response_text
     }
@@ -534,7 +565,8 @@ async def google_auth_get(action: str = None, code: str = None, state: str = "re
     raise HTTPException(status_code=400, detail="Invalid request")
 
 @app.post("/auth/google")
-async def google_auth(data: GoogleAuthRequest):
+@limiter.limit(os.getenv("RATE_LIMIT_AUTH", "10/minute"))
+async def google_auth(request: Request, data: GoogleAuthRequest):
     if not GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
     try:
@@ -568,7 +600,8 @@ async def google_auth(data: GoogleAuthRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/signup")
-async def signup(data: AuthRequest):
+@limiter.limit(os.getenv("RATE_LIMIT_AUTH", "10/minute"))
+async def signup(request: Request, data: AuthRequest):
     user = get_user_by_email(data.email)
     if user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -583,7 +616,8 @@ async def signup(data: AuthRequest):
     return {"access_token": access_token, "token_type": "bearer", "user_id": user_id, "email": data.email}
 
 @app.post("/login")
-async def login(data: AuthRequest):
+@limiter.limit(os.getenv("RATE_LIMIT_AUTH", "10/minute"))
+async def login(request: Request, data: AuthRequest):
     user = get_user_by_email(data.email)
     if not user or not verify_password(data.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -636,9 +670,10 @@ async def save_community_prompt(data: CommunitySaveRequest, current_user: dict =
     return {"message": "Saved to library", "id": new_id}
 
 @app.post("/community/report/{prompt_id}")
-async def report_community_prompt(prompt_id: int):
-    # Dummy endpoint to satisfy the frontend reporting feature requirement
-    # Normally this would log a report to the database and notify an admin
+async def report_community_prompt(prompt_id: int, current_user: dict = Depends(get_current_user)):
+    # Requires authentication so reports are attributable and not spoofable.
+    # Normally this would log a report to the database and notify an admin.
+    logger.info(f"Community prompt {prompt_id} reported by user {current_user['id']}")
     return {"message": "Prompt reported successfully"}
 
 # =========================
@@ -665,7 +700,7 @@ async def api_get_template(template_id: str):
     return template
 
 @app.post("/api/templates")
-async def api_create_template(data: TemplateRequest):
+async def api_create_template(data: TemplateRequest, current_user: dict = Depends(get_current_user)):
     if not allow_template_mutations():
         raise HTTPException(status_code=403, detail="Template mutations are disabled in production")
     import uuid
@@ -676,7 +711,7 @@ async def api_create_template(data: TemplateRequest):
     return {"id": template_id, "message": "Template created successfully"}
 
 @app.put("/api/templates/{template_id}")
-async def api_update_template(template_id: str, data: TemplateRequest):
+async def api_update_template(template_id: str, data: TemplateRequest, current_user: dict = Depends(get_current_user)):
     if not allow_template_mutations():
         raise HTTPException(status_code=403, detail="Template mutations are disabled in production")
     success = update_template(
@@ -687,7 +722,7 @@ async def api_update_template(template_id: str, data: TemplateRequest):
     return {"message": "Template updated successfully"}
 
 @app.delete("/api/templates/{template_id}")
-async def api_delete_template(template_id: str):
+async def api_delete_template(template_id: str, current_user: dict = Depends(get_current_user)):
     if not allow_template_mutations():
         raise HTTPException(status_code=403, detail="Template mutations are disabled in production")
     success = delete_template(template_id)

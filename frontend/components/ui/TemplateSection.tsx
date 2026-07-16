@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { createPortal } from "react-dom";
 import { Search, Mail, FileText, Code, Image as ImageIcon, BarChart, Search as SearchIcon, X, Filter } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,7 +45,7 @@ export default function TemplateSection({ onSelect }: { onSelect: (templateText:
     const fetchTemplates = async () => {
       setLoading(true);
       try {
-        let url = `${process.env.NEXT_PUBLIC_API_URL}/api/templates?`;
+        let url = `${getApiUrl()}/api/templates?`;
         if (category !== "All") {
           url += `category=${encodeURIComponent(category)}&`;
         }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import Link from "next/link";
 import Header from "@/components/ui/Header";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -88,7 +89,7 @@ export default function LibraryPage() {
 const fetchLibrary = async () => {
   if (!user || !token) return;
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/library?user_id=${user.id}`, {
+    const response = await fetch(`${getApiUrl()}/library?user_id=${user.id}`, {
       headers: {
         "Authorization": `Bearer ${token}`
       }
@@ -131,7 +132,7 @@ useEffect(() => {
     if (!user || !publishModalPrompt) return;
     try {
       setPublishingId(publishModalPrompt.id);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/community/publish`, {
+      const response = await fetch(`${getApiUrl()}/community/publish`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -209,7 +210,7 @@ useEffect(() => {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: "30px", marginBottom: "20px",
                   color: "#000000"
-                }}>📚</div>
+                }} aria-hidden="true">📚</div>
                 <h1 style={{ color: "#000000", fontSize: "42px", fontWeight: 800, margin: 0, letterSpacing: "-1.5px" }}>
                   Personal Prompt Library
                 </h1>
@@ -222,6 +223,7 @@ useEffect(() => {
                   <input
                     type="text"
                     placeholder="Search by name, category, or tags..."
+                    aria-label="Search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={{
@@ -238,7 +240,7 @@ useEffect(() => {
                       boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.05)",
                     }}
                   />
-                  <div style={{ position: "absolute", left: "20px", top: "50%", transform: "translateY(-50%)", fontSize: "20px", opacity: 0.5 }}>🔍</div>
+                  <div style={{ position: "absolute", left: "20px", top: "50%", transform: "translateY(-50%)", fontSize: "20px", opacity: 0.5 }} aria-hidden="true">🔍</div>
                 </div>
               </div>
 
@@ -485,6 +487,7 @@ useEffect(() => {
                 >
                   <button
                     onClick={() => setIsSettingsOpen(false)}
+                    aria-label="Close"
                     style={{
                       position: "absolute",
                       top: "20px",
@@ -540,6 +543,7 @@ useEffect(() => {
                     <div style={{ position: "relative" }}>
                       <select
                         value={settingsApiProvider}
+                        aria-label="API provider"
                         onChange={(e) => {
                           setSettingsApiProvider(e.target.value);
                           setSettingsApiModel("");
@@ -567,6 +571,7 @@ useEffect(() => {
                     <div style={{ position: "relative" }}>
                       <select
                         value={settingsApiModel}
+                        aria-label="Model"
                         onChange={(e) => setSettingsApiModel(e.target.value)}
                         disabled={!settingsApiProvider}
                         style={{
@@ -596,6 +601,7 @@ useEffect(() => {
                       value={settingsApiKey}
                       onChange={(e) => setSettingsApiKey(e.target.value)}
                       placeholder="Enter API Key (or leave empty for 'free')"
+                      aria-label="API key"
                       style={{
                         width: "100%",
                         padding: "10px 12px",
@@ -747,6 +753,7 @@ useEffect(() => {
                       setPublishModalPrompt(null);
                       setPublishMessage(null);
                     }}
+                    aria-label="Close"
                     style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}
                   >
                     <X size={20} />

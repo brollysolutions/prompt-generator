@@ -7,6 +7,25 @@
   --primary-foreground: #ffffff;
 }
 
+/* Skip-to-content link: visually hidden until keyboard-focused (WCAG 2.4.1). */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 1000;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #000000;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 8px;
+  outline: 2px solid #D4AF37;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -16,6 +35,9 @@
   --font-mono: var(--font-geist-mono);
   --color-gold: #D4AF37;
   --color-gold-dark: #AA8A27;
+  /* Accessible gold for SMALL text on white (>=4.5:1 WCAG AA). Use this instead
+     of --color-gold / #D4AF37 wherever gold is used as body/label/helper text. */
+  --color-gold-text: #6B5310;
   --shadow-button: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-button-inset: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
   --shadow-button-inset-dark: inset 0 2px 4px 0 rgb(0 0 0 / 0.5);

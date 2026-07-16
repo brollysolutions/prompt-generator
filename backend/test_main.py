@@ -9,6 +9,8 @@ os.environ["JWT_SECRET"] = "testsecretkeyforjwttokengeneration123456"
 os.environ["DB_PATH"] = "test_scores.db"
 os.environ["ALLOW_TEMPLATE_MUTATIONS"] = "true"
 os.environ["ALLOW_PRO_TOGGLE"] = "true"
+# Disable rate limiting so repeated auth/LLM calls across tests don't hit 429.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 # Mock the API keys so wrappers don't raise ValueError during import/init
 os.environ["GROQ_API_KEY"] = "mock-groq-key-1234567890"
@@ -274,20 +276,33 @@ class TestBackendApp(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["enhanced_prompt"], "Enhanced prompt contents.")
 
-    @patch("services.groq_service.get_client")
-    def test_test_prompt(self, mock_get_groq):
-        mock_choice = MagicMock()
-        mock_choice.message.content = "AI outputs demonstration."
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        
+    @patch("services.gemini_service.get_client")
+    def test_test_prompt_english_routes_to_gemini(self, mock_get_gemini):
+        # English prompts route to Gemini for the test-prompt demonstration.
+        mock_res = MagicMock()
+        mock_res.text = "AI outputs demonstration."
         mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
-        mock_get_groq.return_value = mock_client
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_res)
+        mock_get_gemini.return_value = mock_client
 
         response = self.client.post("/test-prompt", json={"prompt": "Write a story."})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["response"], "AI outputs demonstration.")
+
+    @patch("services.groq_service.get_client")
+    def test_test_prompt_regional_routes_to_groq(self, mock_get_groq):
+        # Regional (Hinglish/Teluglish) prompts route to Groq.
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Groq demonstration output."
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        mock_get_groq.return_value = mock_client
+
+        response = self.client.post("/test-prompt", json={"prompt": "Mujhe ek kahani likhkar do."})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["response"], "Groq demonstration output.")
 
     def test_history_crud(self):
         # 1. Auth Setup
@@ -360,12 +375,11 @@ class TestBackendApp(unittest.TestCase):
         self.assertEqual(res_del.status_code, 200)
 
     def test_templates_endpoints(self):
-        # 1. Get templates
+        # 1. Get templates (public read)
         response = self.client.get("/api/templates")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json()) > 0) # seeded templates should load
 
-        # 2. Create template
         template_data = {
             "name": "New Test Template",
             "category": "Coding",
@@ -373,22 +387,33 @@ class TestBackendApp(unittest.TestCase):
             "template_text": "Write a {model} scaffold.",
             "icon": "code"
         }
-        res_create = self.client.post("/api/templates", json=template_data)
+
+        # 2. Mutations require authentication -> 401 without a token
+        res_unauth = self.client.post("/api/templates", json=template_data)
+        self.assertEqual(res_unauth.status_code, 401)
+
+        # Authenticate for the mutation calls
+        res_auth = self.client.post("/signup", json={"email": "tmpl@example.com", "password": "password123"})
+        token = res_auth.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 3. Create template (authenticated)
+        res_create = self.client.post("/api/templates", json=template_data, headers=headers)
         self.assertEqual(res_create.status_code, 200)
         template_id = res_create.json()["id"]
 
-        # 3. Get single template
+        # 4. Get single template (public read)
         res_single = self.client.get(f"/api/templates/{template_id}")
         self.assertEqual(res_single.status_code, 200)
         self.assertEqual(res_single.json()["name"], "New Test Template")
 
-        # 4. Update template
+        # 5. Update template (authenticated)
         template_data["name"] = "Updated Test Template"
-        res_update = self.client.put(f"/api/templates/{template_id}", json=template_data)
+        res_update = self.client.put(f"/api/templates/{template_id}", json=template_data, headers=headers)
         self.assertEqual(res_update.status_code, 200)
 
-        # 5. Delete template
-        res_delete = self.client.delete(f"/api/templates/{template_id}")
+        # 6. Delete template (authenticated)
+        res_delete = self.client.delete(f"/api/templates/{template_id}", headers=headers)
         self.assertEqual(res_delete.status_code, 200)
 
     def test_analytics_and_pro_toggle(self):
@@ -439,6 +464,28 @@ class TestBackendApp(unittest.TestCase):
         # 5. Revoke share
         res_revoke = self.client.delete(f"/api/share/{share_token}", headers=headers)
         self.assertEqual(res_revoke.status_code, 200)
+
+    def test_community_report_requires_auth(self):
+        # Unauthenticated report is rejected
+        res_unauth = self.client.post("/community/report/1")
+        self.assertEqual(res_unauth.status_code, 401)
+
+        # Authenticated report succeeds
+        res_auth = self.client.post("/signup", json={"email": "reporter@example.com", "password": "password123"})
+        token = res_auth.json()["access_token"]
+        res_ok = self.client.post("/community/report/1", headers={"Authorization": f"Bearer {token}"})
+        self.assertEqual(res_ok.status_code, 200)
+
+    def test_library_dedup(self):
+        from database import save_library_prompt, get_library_prompts
+        uid = 4242
+        id1 = save_library_prompt("Name A", "IDENTICAL PROMPT", ["t"], "Cat", uid)
+        id2 = save_library_prompt("Name B", "IDENTICAL PROMPT", ["t"], "Cat", uid)
+        id3 = save_library_prompt("Name C", "DIFFERENT PROMPT", ["t"], "Cat", uid)
+        # Same text -> same row returned (no duplicate); different text -> new row
+        self.assertEqual(id1, id2)
+        self.assertNotEqual(id1, id3)
+        self.assertEqual(len(get_library_prompts(uid)), 2)
 
 if __name__ == "__main__":
     unittest.main()

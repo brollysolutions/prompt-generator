@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Copy, Play, User, Settings, LogOut, Key, Save, Edit2, X, ChevronDown, Share } from "lucide-react";
 
@@ -226,7 +227,7 @@ export default function GeneratorPage() {
     try {
       setLoadingTest(true);
       setTestResponse(null);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/test-prompt`, {
+      const response = await fetch(`${getApiUrl()}/test-prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -254,7 +255,7 @@ export default function GeneratorPage() {
       setFinalPrompt(null);
       setAnswers({});
       setCustomAnswers({});
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-questions`, {
+      const response = await fetch(`${getApiUrl()}/generate-questions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -305,7 +306,7 @@ export default function GeneratorPage() {
         }
       });
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-final-prompt`, {
+      const response = await fetch(`${getApiUrl()}/generate-final-prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -329,7 +330,7 @@ export default function GeneratorPage() {
 
       // Save to history
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
+        await fetch(`${getApiUrl()}/history`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -347,7 +348,7 @@ export default function GeneratorPage() {
 
       // Auto-score the generated prompt
       try {
-      const scoreResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/score-prompt`, {
+      const scoreResponse = await fetch(`${getApiUrl()}/score-prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -452,7 +453,7 @@ export default function GeneratorPage() {
               {/* Input Card with Static Gold Border */}
               <div className="bg-white/70 backdrop-blur-md border border-[#D4AF37]/50 p-5 md:p-8 w-full rounded-3xl mb-7 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)]">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                  <label style={{ color: "#D4AF37", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                  <label htmlFor="user-idea-input" style={{ color: "#D4AF37", fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.8px" }}>
                     Your Idea
                   </label>
                 </div>
@@ -504,7 +505,7 @@ export default function GeneratorPage() {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "16px",
                         color: "#000000"
-                      }}>❓</div>
+                      }} aria-hidden="true">❓</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h2 className="text-black text-base md:text-[22px] font-bold m-0" style={{ whiteSpace: "normal", wordBreak: "break-word", lineHeight: "1.2" }}>
                           AI Follow-up Questions
@@ -553,6 +554,7 @@ export default function GeneratorPage() {
                               id={`answer-${index}`}
                               type="text"
                               placeholder="Type your answer here..."
+                              aria-label={q.question || "Answer"}
                               value={answers[index] || ""}
                               onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
                               style={{
@@ -577,6 +579,7 @@ export default function GeneratorPage() {
                           <textarea
                             id={`answer-${index}`}
                             placeholder="Type your answer here..."
+                            aria-label={q.question || "Answer"}
                             value={answers[index] || ""}
                             onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
                             style={{
@@ -604,6 +607,7 @@ export default function GeneratorPage() {
                               <select
                                 id={`answer-${index}`}
                                 value={answers[index] || ""}
+                                aria-label={q.question || "Answer"}
                                 onChange={(e) => setAnswers({ ...answers, [index]: e.target.value })}
                                 style={{
                                   display: "block",
@@ -1098,6 +1102,7 @@ export default function GeneratorPage() {
           >
             <button
               onClick={() => setIsSettingsOpen(false)}
+              aria-label="Close"
               style={{
                 position: "absolute",
                 top: "20px",
@@ -1153,6 +1158,7 @@ export default function GeneratorPage() {
                     <div style={{ position: "relative" }}>
                       <select
                         value={settingsApiProvider}
+                        aria-label="API provider"
                         onChange={(e) => {
                           setSettingsApiProvider(e.target.value);
                           setSettingsApiModel("");
@@ -1180,6 +1186,7 @@ export default function GeneratorPage() {
                     <div style={{ position: "relative" }}>
                       <select
                         value={settingsApiModel}
+                        aria-label="Model"
                         onChange={(e) => setSettingsApiModel(e.target.value)}
                         disabled={!settingsApiProvider}
                         style={{
@@ -1209,6 +1216,7 @@ export default function GeneratorPage() {
                       value={settingsApiKey}
                       onChange={(e) => setSettingsApiKey(e.target.value)}
                       placeholder="Enter API Key (or leave empty for 'free')"
+                      aria-label="API key"
                       style={{
                         width: "100%",
                         padding: "10px 12px",

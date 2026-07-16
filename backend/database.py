@@ -165,6 +165,22 @@ def init_db():
             )
         ''')
 
+        # Indexes on hot query columns (all were full table scans before).
+        # Additive and idempotent — safe to run on every boot.
+        index_statements = [
+            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_user ON prompt_versions(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_session ON prompt_versions(session_id)",
+            "CREATE INDEX IF NOT EXISTS idx_library_prompts_user ON library_prompts(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_usage_events_user ON prompt_usage_events(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_usage_events_created ON prompt_usage_events(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_shared_prompts_creator ON shared_prompts(created_by)",
+            "CREATE INDEX IF NOT EXISTS idx_community_upvotes_prompt ON community_upvotes(prompt_id)",
+            "CREATE INDEX IF NOT EXISTS idx_community_prompts_upvotes ON community_prompts(upvotes)",
+            "CREATE INDEX IF NOT EXISTS idx_community_prompts_author ON community_prompts(author_id)",
+        ]
+        for stmt in index_statements:
+            cursor.execute(stmt)
+
         conn.commit()
 
 
@@ -314,6 +330,16 @@ def get_prompt_history(session_id: str = None, user_id: int | None = None):
 def save_library_prompt(name: str, prompt_text: str, tags: list, category: str, user_id: int = 0) -> int:
     with get_db() as conn:
         cursor = conn.cursor()
+        # Dedup: if this user already has an identical prompt, return it instead of
+        # inserting a duplicate (every generation used to append a new row unbounded).
+        cursor.execute(
+            'SELECT id FROM library_prompts WHERE user_id = ? AND prompt_text = ? LIMIT 1',
+            (user_id, prompt_text)
+        )
+        existing = cursor.fetchone()
+        if existing:
+            return existing[0]
+
         normalized_tags = _normalize_tags(tags)
         cursor.execute('''
             INSERT INTO library_prompts (name, prompt_text, tags, category, user_id)

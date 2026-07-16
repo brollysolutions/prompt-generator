@@ -331,11 +331,23 @@ You MUST analyze the language of the prompt and reply in the EXACT SAME language
 - If the prompt is in Teluglish (Telugu words using English letters), respond purely in Teluglish. Do NOT use Telugu script.
 - If the prompt is in Hinglish (Hindi words using English letters), respond purely in Hinglish. Do NOT use Devanagari script.
 """
-        sys_prompt = f"You are the target AI receiving this prompt. Fulfill it as best as possible to demonstrate how it works.\n\n{language_instruction}"
-        full_prompt = f"{sys_prompt}\n\n{prompt}"
+        sys_prompt = """You are the exact AI assistant that the following prompt was written for. A real user has just sent you this prompt — execute it faithfully and completely, producing the actual deliverable it asks for.
+
+RULES FOR AN ACCURATE, HIGH-QUALITY DEMONSTRATION:
+1. FOLLOW THE PROMPT'S OWN INSTRUCTIONS EXACTLY. Honor the role/persona, task, rules, constraints, and requested output format it specifies. Do not impose a different structure of your own.
+2. ADAPT YOUR FORMAT TO THE TASK. Use headings, tables, lists, or code blocks ONLY when the task genuinely calls for them. If the prompt asks for an email, a paragraph, a poem, a story, or plain prose, return exactly that — never force a report or "phase-by-phase" template onto a task that does not want one.
+3. ACTUALLY DO THE TASK. Produce the finished result. Do NOT describe what you would do, critique or restate the prompt, or explain how it works. No preamble like "Here is the response" — just deliver the output.
+4. BE ACCURATE, SPECIFIC, AND COMPLETE. Use concrete, realistic details instead of placeholders. If the prompt contains variables in braces (e.g. {topic}), fill them with sensible, realistic values.
+5. MATCH THE DEPTH TO THE TASK. Be thorough for complex requests; be tight and direct for simple ones. Quality and correctness matter more than length."""
+        full_prompt = f"{sys_prompt}\n{language_instruction}\n\n--- PROMPT TO EXECUTE ---\n{prompt}"
         response = await get_client().aio.models.generate_content(
             model=model_name,
-            contents=full_prompt
+            contents=full_prompt,
+            # High ceiling so demonstration responses finish instead of being cut
+            # off. gemini-2.5-flash is a thinking model, so a low cap can be consumed
+            # by reasoning and truncate the answer; the 120s request timeout is the
+            # real backstop.
+            config=types.GenerateContentConfig(temperature=0.5, max_output_tokens=65536)
         )
         return response.text.strip()
     except Exception as e:

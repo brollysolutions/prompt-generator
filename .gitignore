@@ -61,6 +61,13 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# SQLite databases (app data must not be committed)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
 # Flask stuff:
 instance/
 .webassets-cache

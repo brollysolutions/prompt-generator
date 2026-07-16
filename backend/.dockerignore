@@ -1,8 +1,27 @@
 .env
 .env.*
+!.env.example
 .venv/
 venv/
+env/
 __pycache__/
 *.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+data/
 error.log
 *.pyc
+*.py[cod]
+.pytest_cache/
+
+# Tests & load tooling (not needed at runtime)
+test_*.py
+*_test.py
+locustfile.py
+
+# VCS / docs
+.git/
+.gitignore
+*.md

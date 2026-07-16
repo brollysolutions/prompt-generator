@@ -186,6 +186,9 @@ Return ONLY a JSON object matching this exact schema:
 # =========================
 
 async def generate_final_prompt(user_input, answers, questions=None, target_ai="", tone="Auto", output_format="Auto", length="Auto", role="", caveman_mode=False):
+    # Initialize before the try so the except-block fallback can always reference it
+    # (otherwise an early failure would raise NameError instead of returning the fallback).
+    qa_context = "(No answers provided)"
     try:
         # Build detailed Q&A context using question text if available
         qa_lines = []
@@ -463,16 +466,16 @@ async def enhance_prompt_text(original_prompt: str, instruction: str) -> str:
 # =========================
 
 TEST_PROMPT_SYSTEM_INSTRUCTION = """
-Act as an expert AI prompt engineer and consultant. Your task is to take the provided generated final prompt as input and give a response that is highly relevant, professional, and visually structured.
+You are the exact AI assistant that the following prompt was written for. A real user has just sent you this prompt — execute it faithfully and completely, producing the actual deliverable it asks for.
 
-The response MUST be presented in a high-end, consultative format. Where possible, use:
-1. "Phase-by-Phase Details" headers.
-2. Comprehensive Markdown tables for comparisons, feature lists, or cost breakdowns.
-3. Clean lists with checkboxes for feature verification or checklists.
+RULES FOR AN ACCURATE, HIGH-QUALITY DEMONSTRATION:
+1. FOLLOW THE PROMPT'S OWN INSTRUCTIONS EXACTLY. Honor the role/persona, task, rules, constraints, and requested output format it specifies. Do not impose a different structure of your own.
+2. ADAPT YOUR FORMAT TO THE TASK. Use headings, tables, lists, or code blocks ONLY when the task genuinely calls for them. If the prompt asks for an email, a paragraph, a poem, a story, or plain prose, return exactly that — never force a "consultant report" or "phase-by-phase" template onto a task that does not want one.
+3. ACTUALLY DO THE TASK. Produce the finished result. Do NOT describe what you would do, critique or analyze the prompt, restate it, or explain how it works. No preamble like "Here is the response" — just deliver the output.
+4. BE ACCURATE, SPECIFIC, AND COMPLETE. Use concrete, realistic details instead of placeholders. If the prompt contains variables in braces (e.g. {topic}), fill them with sensible, realistic values.
+5. MATCH THE DEPTH TO THE TASK. Be thorough and nuanced for complex requests; be tight and direct for simple ones. Quality and correctness matter more than length.
 
-The content should cover key aspects, objectives, challenges, and use cases while avoiding ambiguity. Ensure the output is suitable for a professional report or high-level strategic document.
-
-Furthermore, engage in deep thinking and reasoning. Simulate the advanced reasoning capabilities and response styles of top-tier AI models. Provide a highly structured, comprehensive, and nuanced output that looks polished and expert-level.
+Respond exactly as a top-tier AI model would when genuinely trying its hardest on this specific request.
 """
 
 async def test_generated_prompt(prompt: str) -> str:
@@ -491,10 +494,13 @@ NEVER use native Telugu script or Devanagari script under any circumstances. Alw
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": TEST_PROMPT_SYSTEM_INSTRUCTION + "\n\n" + language_instruction},
-                {"role": "user", "content": f"Execute the following prompt:\n\n{prompt}"}
+                {"role": "user", "content": prompt}
             ],
-            temperature=0.6,
-            max_tokens=2500
+            temperature=0.5,
+            # High ceiling so demonstration responses finish instead of being cut
+            # off mid-sentence. This is the model's max completion length; the real
+            # backstop is the 120s request timeout.
+            max_tokens=32768
         )
         return response.choices[0].message.content.strip()
     except Exception as e:

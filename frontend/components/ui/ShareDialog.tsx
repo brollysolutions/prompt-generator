@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getApiUrl } from "@/lib/api";
 import { X, Link as LinkIcon, Check, Globe, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -34,7 +35,7 @@ export default function ShareDialog({
     if (!token) return;
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/prompts/share`, {
+      const response = await fetch(`${getApiUrl()}/api/prompts/share`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,6 +99,7 @@ export default function ShareDialog({
           >
             <button
               onClick={handleClose}
+              aria-label="Close"
               style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}
             >
               <X size={20} />

@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { ShieldCheck, ArrowRight, Mail, Lock, House, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
-import { API_URL } from "@/lib/api_config";
+import { getApiUrl } from "@/lib/api";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -35,12 +35,9 @@ export default function LoginPage() {
   const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     setLoading(true);
     setError("");
-    
-    // Debug log to check the API URL in the production console
-    console.log("Using API URL:", API_URL);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+      const response = await fetch(`${getApiUrl()}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential }),
@@ -67,7 +64,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
+      const response = await fetch(`${getApiUrl()}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -171,6 +168,7 @@ export default function LoginPage() {
             <input
               type="email"
               placeholder="Email address"
+              aria-label="Email address"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -197,6 +195,7 @@ export default function LoginPage() {
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Password"
+              aria-label="Password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -217,6 +216,8 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
               style={{
                 position: "absolute",
                 right: "16px",
@@ -263,20 +264,25 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div style={{ margin: "16px 0", display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
-          <span style={{ color: "#9CA3AF", fontSize: "12px", fontWeight: 600 }}>OR</span>
-          <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
-        </div>
+        {/* GoogleOAuthProvider is only mounted when the client ID is set (see layout.tsx) */}
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          <>
+            <div style={{ margin: "16px 0", display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
+              <span style={{ color: "#9CA3AF", fontSize: "12px", fontWeight: 600 }}>OR</span>
+              <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
+            </div>
 
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError("Google Login Failed")}
-            theme="outline"
-            shape="pill"
-          />
-        </div>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError("Google Login Failed")}
+                theme="outline"
+                shape="pill"
+              />
+            </div>
+          </>
+        )}
 
         <p style={{ textAlign: "center", marginTop: "16px", color: "#4B5563", fontSize: "14px" }}>
           Don&apos;t have an account?{" "}
@@ -317,6 +323,7 @@ export default function LoginPage() {
             <div style={{ position: "relative", marginBottom: "16px" }}>
               <select
                 value={apiProvider}
+                aria-label="API provider"
                 onChange={(e) => {
                   setApiProvider(e.target.value);
                   setApiModel(""); // Reset model when provider changes
@@ -371,6 +378,7 @@ export default function LoginPage() {
             <div style={{ position: "relative", marginBottom: "16px" }}>
               <select
                 value={apiModel}
+                aria-label="Model"
                 onChange={(e) => setApiModel(e.target.value)}
                 disabled={!apiProvider}
                 style={{
@@ -423,6 +431,7 @@ export default function LoginPage() {
             <input
               type="text"
               placeholder="Enter your API Key (optional)"
+              aria-label="API key"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
               style={{

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
 import { User, ShieldCheck, Eye, Download, LogIn } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -31,7 +32,7 @@ export default function SharePage() {
     if (!token) return;
     const fetchPrompt = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/share/${token}`);
+        const response = await fetch(`${getApiUrl()}/api/share/${token}`);
         if (response.ok) {
           const data = await response.json();
           setPrompt(data);
@@ -59,7 +60,7 @@ export default function SharePage() {
     
     setSaveStatus("saving");
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/share/${token}/save`, {
+      const response = await fetch(`${getApiUrl()}/api/share/${token}/save`, {
         method: "POST",
         headers: {
           ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})

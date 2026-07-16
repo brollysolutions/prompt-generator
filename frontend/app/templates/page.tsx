@@ -137,7 +137,7 @@ export default function TemplatesPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="bg-white border border-[#D4AF37]/30 rounded-[24px] p-6 md:p-8 w-full max-w-[450px] shadow-[0_20px_40px_rgba(0,0,0,0.1)] relative"
             >
-              <button onClick={() => setIsSettingsOpen(false)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}>
+              <button onClick={() => setIsSettingsOpen(false)} aria-label="Close" style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}>
                 <X size={20} />
               </button>
 
@@ -155,20 +155,20 @@ export default function TemplatesPage() {
                   {isEditingSettingsKey ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                       <div style={{ position: "relative" }}>
-                        <select value={settingsApiProvider} onChange={(e) => { setSettingsApiProvider(e.target.value); setSettingsApiModel(""); }} style={{ width: "100%", padding: "10px 32px 10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", appearance: "none", background: "#ffffff", color: settingsApiProvider === "" ? "#9CA3AF" : "#000000" }}>
+                        <select value={settingsApiProvider} aria-label="API provider" onChange={(e) => { setSettingsApiProvider(e.target.value); setSettingsApiModel(""); }} style={{ width: "100%", padding: "10px 32px 10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", appearance: "none", background: "#ffffff", color: settingsApiProvider === "" ? "#9CA3AF" : "#000000" }}>
                           <option value="" disabled hidden>Enter the API Name</option>
                           {Object.keys(PROVIDER_MODELS).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                         <ChevronDown size={16} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#9CA3AF" }} />
                       </div>
                       <div style={{ position: "relative" }}>
-                        <select value={settingsApiModel} onChange={(e) => setSettingsApiModel(e.target.value)} disabled={!settingsApiProvider} style={{ width: "100%", padding: "10px 32px 10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", appearance: "none", background: !settingsApiProvider ? "#F3F4F6" : "#ffffff", color: settingsApiModel === "" ? "#9CA3AF" : "#000000" }}>
+                        <select value={settingsApiModel} aria-label="Model" onChange={(e) => setSettingsApiModel(e.target.value)} disabled={!settingsApiProvider} style={{ width: "100%", padding: "10px 32px 10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", appearance: "none", background: !settingsApiProvider ? "#F3F4F6" : "#ffffff", color: settingsApiModel === "" ? "#9CA3AF" : "#000000" }}>
                           <option value="" disabled hidden>{!settingsApiProvider ? "Select a provider first" : "Enter the Model"}</option>
                           {settingsApiProvider && PROVIDER_MODELS[settingsApiProvider]?.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
                         <ChevronDown size={16} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#9CA3AF" }} />
                       </div>
-                      <input type="text" value={settingsApiKey} onChange={(e) => setSettingsApiKey(e.target.value)} placeholder="Enter API Key (or leave empty for 'free')" style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", boxSizing: "border-box", color: "#000" }} />
+                      <input type="text" value={settingsApiKey} onChange={(e) => setSettingsApiKey(e.target.value)} placeholder="Enter API Key (or leave empty for 'free')" aria-label="API key" style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "2px solid #D4AF37", fontSize: "14px", outline: "none", boxSizing: "border-box", color: "#000" }} />
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button onClick={handleSaveSettingsKey} style={{ flex: 1, background: "#000000", color: "#ffffff", border: "none", borderRadius: "8px", padding: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}><Save size={14} /> Save</button>
                         <button onClick={() => setIsEditingSettingsKey(false)} style={{ flex: 1, background: "#f3f4f6", color: "#4b5563", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>Cancel</button>

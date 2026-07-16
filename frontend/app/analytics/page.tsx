@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
-import { ArrowLeft, TrendingUp, Lock, Crown, BarChart3, Clock, Zap } from "lucide-react";
+import { ArrowLeft, TrendingUp, Crown, BarChart3, Clock, Zap } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -55,62 +56,52 @@ export default function AnalyticsPage() {
   const [reportCard, setReportCard] = useState<ReportCardData | null>(null);
   const [trendRange, setTrendRange] = useState(30);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    fetchData();
-  }, [user, authLoading, trendRange]);
-
+  // Function declaration (hoisted) placed before the effect that uses it.
   async function fetchData() {
     setLoading(true);
     try {
-      const overviewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/overview`, {
+      const overviewRes = await fetch(`${getApiUrl()}/api/analytics/overview`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` }
       });
-      
+
       if (overviewRes.status === 403) {
         setIsPro(false);
         setLoading(false);
         return;
       }
-      
+
       setIsPro(true);
       const overviewData = await overviewRes.json();
       setOverview(overviewData);
 
       const [mostUsedRes, trendRes, reportCardRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/most-used`, { headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/quality-trend?range=${trendRange}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/report-card`, { headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` } })
+        fetch(`${getApiUrl()}/api/analytics/most-used`, { headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` } }),
+        fetch(`${getApiUrl()}/api/analytics/quality-trend?range=${trendRange}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` } }),
+        fetch(`${getApiUrl()}/api/analytics/report-card`, { headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` } })
       ]);
 
       const mostUsedData = await mostUsedRes.json();
       const trendData = await trendRes.json();
-      
+
       setMostUsed(mostUsedData.prompts || []);
       setTrend(trendData.trend || []);
       setReportCard(await reportCardRes.json());
-      
+
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
     }
     setLoading(false);
   }
 
-  const handleTogglePro = async () => {
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/toggle-pro`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("auth_token")}` }
-      });
-      fetchData();
-    } catch (error) {
-      console.error("Error toggling pro:", error);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/login");
+      return;
     }
-  };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+  }, [user, authLoading, trendRange]);
 
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center font-semibold text-gray-500">Loading...</div>;
@@ -140,6 +131,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/generator")}
+              aria-label="Back to generator"
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
               <ArrowLeft size={20} className="text-gray-600" />
@@ -172,13 +164,6 @@ export default function AnalyticsPage() {
                 <p className="text-gray-600 mb-6 text-sm leading-relaxed">
                   See which prompts you use most, track your average quality scores over time, and get a personalized report card on how your prompt writing has improved.
                 </p>
-                <button 
-                  onClick={handleTogglePro}
-                  className="w-full py-3.5 bg-gradient-to-r from-black to-gray-800 text-[#D4AF37] rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
-                >
-                  <Lock size={16} />
-                  Unlock Pro (Test)
-                </button>
               </div>
             </div>
 

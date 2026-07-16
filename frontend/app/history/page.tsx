@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, Edit, Maximize2, X, Trash2, User, Settings, LogOut, Key, Save, Edit2, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_URL } from "@/lib/api_config";
+import { getApiUrl } from "@/lib/api";
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   "GroqCloud": ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
@@ -97,7 +97,7 @@ export default function HistoryPage() {
     if (!sid) return;
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history?session_id=${sid}`, {
+      const response = await fetch(`${getApiUrl()}/history?session_id=${sid}`, {
         headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
       });
       const data = await response.json();
@@ -139,7 +139,7 @@ export default function HistoryPage() {
   const handleSaveEdit = async (versionId: number) => {
     try {
       setIsSavingEdit(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
+      const response = await fetch(`${getApiUrl()}/history`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -172,7 +172,7 @@ export default function HistoryPage() {
   const confirmDelete = async () => {
     if (versionToDelete === null) return;
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history/${versionToDelete}`, {
+      const response = await fetch(`${getApiUrl()}/history/${versionToDelete}`, {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
       });
@@ -205,7 +205,7 @@ export default function HistoryPage() {
       }
 
       // Create a new version for the restore action
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history`, {
+      const response = await fetch(`${getApiUrl()}/history`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -280,7 +280,7 @@ export default function HistoryPage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "30px", marginBottom: "20px",
               color: "#000000"
-            }}>📜</div>
+            }} aria-hidden="true">📜</div>
             <h1 style={{ color: "#000000", fontSize: "42px", fontWeight: 800, margin: 0, letterSpacing: "-1.5px" }}>
               Version History
             </h1>
@@ -462,6 +462,7 @@ export default function HistoryPage() {
             <h2 style={{ color: "#000000", margin: 0, fontWeight: 800 }}>Version Comparison</h2>
             <button
               onClick={() => setIsComparing(false)}
+              aria-label="Close"
               style={{
                 background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: "50%",
                 width: "40px", height: "40px", color: "#000000", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
@@ -524,6 +525,7 @@ export default function HistoryPage() {
             >
               <button
                 onClick={() => setIsSettingsOpen(false)}
+                aria-label="Close"
                 style={{
                   position: "absolute",
                   top: "20px",
@@ -579,6 +581,7 @@ export default function HistoryPage() {
                     <div style={{ position: "relative" }}>
                       <select
                         value={settingsApiProvider}
+                        aria-label="API provider"
                         onChange={(e) => {
                           setSettingsApiProvider(e.target.value);
                           setSettingsApiModel("");
@@ -606,6 +609,7 @@ export default function HistoryPage() {
                     <div style={{ position: "relative" }}>
                       <select
                         value={settingsApiModel}
+                        aria-label="Model"
                         onChange={(e) => setSettingsApiModel(e.target.value)}
                         disabled={!settingsApiProvider}
                         style={{
@@ -635,6 +639,7 @@ export default function HistoryPage() {
                       value={settingsApiKey}
                       onChange={(e) => setSettingsApiKey(e.target.value)}
                       placeholder="Enter API Key (or leave empty for 'free')"
+                      aria-label="API key"
                       style={{
                         width: "100%",
                         padding: "10px 12px",

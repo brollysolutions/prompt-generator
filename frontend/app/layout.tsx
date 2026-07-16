@@ -15,9 +15,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://brollysolutions.in";
+
 export const metadata: Metadata = {
-  title: "Prompt Generator",
-  description: "AI-powered prompt generation tool",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Smart Prompt Generator",
+    template: "%s | Smart Prompt Generator",
+  },
+  description:
+    "Turn a rough idea into a polished, structured AI prompt with clarifying questions, quality scoring, and multi-language support.",
+  applicationName: "Smart Prompt Generator",
+  keywords: ["AI prompt generator", "prompt engineering", "ChatGPT prompts", "Claude prompts"],
+  openGraph: {
+    title: "Smart Prompt Generator",
+    description:
+      "Turn a rough idea into a polished, structured AI prompt with clarifying questions and quality scoring.",
+    url: siteUrl,
+    siteName: "Smart Prompt Generator",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Smart Prompt Generator",
+    description: "Turn a rough idea into a polished, structured AI prompt.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
@@ -38,14 +61,18 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-x-hidden max-w-[100vw]`}
     >
       <body className="min-h-full flex flex-col overflow-x-hidden w-full max-w-[100vw]">
+        <a href="#main-content" className="skip-link">Skip to content</a>
         <AuthProvider>
-          {googleClientId ? (
-            <GoogleOAuthProvider clientId={googleClientId}>
+          {/* display:contents -> a11y <main> landmark + skip-link target with no layout impact */}
+          <main id="main-content" tabIndex={-1} style={{ display: "contents" }}>
+            {googleClientId ? (
+              <GoogleOAuthProvider clientId={googleClientId}>
+                <TooltipProvider>{children}</TooltipProvider>
+              </GoogleOAuthProvider>
+            ) : (
               <TooltipProvider>{children}</TooltipProvider>
-            </GoogleOAuthProvider>
-          ) : (
-            <TooltipProvider>{children}</TooltipProvider>
-          )}
+            )}
+          </main>
         </AuthProvider>
       </body>
     </html>
