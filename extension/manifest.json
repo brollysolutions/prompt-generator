@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Generator - Enhance Prompt",
+  "version": "1.0.0",
+  "description": "Enhance selected text into a clear, specific, high-quality AI prompt.",
+  "permissions": ["contextMenus"],
+  "host_permissions": ["https://brollysolutions.in/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "Prompt Generator",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
