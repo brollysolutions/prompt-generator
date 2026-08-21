@@ -3,17 +3,153 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Prompt Generator</title>
+    <title>Smart Prompt Generator</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main class="popup">
-      <div class="brand"><span class="logo">✦</span><span>Prompt Generator</span></div>
-      <h1>Enhance any prompt</h1>
-      <p>Select text on a webpage, right-click it, and choose <strong>Enhance Prompt</strong>.</p>
-      <div class="tip"><span>⌘</span><span>Your enhanced prompt will appear in a floating window on the page.</span></div>
-      <div id="status" class="status" role="status">Ready to enhance.</div>
+      <header class="brand">
+        <button id="back-btn" class="icon-btn" type="button" aria-label="Back" hidden>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path d="M10 2 4 8l6 6" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <span class="logo" aria-hidden="true">SP</span>
+        <span id="view-title" class="brand-name">Smart Prompt Generator</span>
+      </header>
+
+      <div id="busy" class="busy" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="busy-text">Working...</span>
+      </div>
+
+      <p id="status" class="status" role="status"></p>
+
+      <!-- ------------------------------------------------------------ home -->
+      <section id="view-home" class="view">
+        <label class="field">
+          <span>What do you want to create?</span>
+          <textarea id="idea-input" rows="2" maxlength="4000"
+                    placeholder="e.g. a Python tutor for absolute beginners"></textarea>
+        </label>
+        <button id="generate-btn" class="btn btn-primary" type="button">Generate Prompt</button>
+
+        <h2 class="section-label">On this page</h2>
+        <div class="row">
+          <button id="enhance-btn" class="btn btn-secondary" type="button">Enhance Selection</button>
+          <button id="score-btn" class="btn btn-secondary" type="button">Score Selection</button>
+        </div>
+
+        <button id="library-btn" class="btn btn-ghost" type="button">My Library</button>
+
+        <section class="score-card">
+          <h2 class="card-label">Quality Score</h2>
+          <div class="score-value"><strong id="score-number">--</strong><span>/ 100</span></div>
+          <ul id="score-breakdown" class="breakdown"></ul>
+          <p id="score-meta" class="score-meta">Run a score to see the breakdown.</p>
+        </section>
+      </section>
+
+      <!-- ------------------------------------------------------- questions -->
+      <section id="view-questions" class="view" hidden>
+        <p class="view-hint">Pick what applies, then create the prompt. Skipping still works.</p>
+        <div id="questions-list" class="questions"></div>
+        <div class="row">
+          <button id="questions-submit" class="btn btn-primary" type="button">Create Prompt</button>
+          <button id="questions-skip" class="btn btn-ghost" type="button">Skip</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- result -->
+      <section id="view-result" class="view" hidden>
+        <h2 id="result-title" class="result-title"></h2>
+        <p id="result-summary" class="result-summary"></p>
+        <pre id="result-prompt" class="prompt-box" tabindex="0"></pre>
+
+        <section class="score-card">
+          <h3 class="card-label">Quality Score</h3>
+          <div class="score-value"><strong id="result-score">--</strong><span>/ 100</span></div>
+          <ul id="result-breakdown" class="breakdown"></ul>
+        </section>
+
+        <div class="row">
+          <button id="result-copy" class="btn btn-primary" type="button">Copy</button>
+          <button id="result-insert" class="btn btn-secondary" type="button">Insert</button>
+        </div>
+        <div class="row">
+          <button id="result-score-btn" class="btn btn-ghost" type="button">Score</button>
+          <button id="result-save" class="btn btn-ghost" type="button">Save to Library</button>
+        </div>
+        <button id="result-test" class="btn btn-ghost" type="button">Test Prompt</button>
+      </section>
+
+      <!-- ------------------------------------------------------------ test -->
+      <section id="view-test" class="view" hidden>
+        <h3 class="section-label">Prompt</h3>
+        <pre id="test-prompt-text" class="prompt-box prompt-box-small"></pre>
+        <h3 class="section-label">AI Response</h3>
+        <pre id="test-response" class="prompt-box"></pre>
+        <div class="row">
+          <button id="test-copy" class="btn btn-primary" type="button">Copy Response</button>
+          <button id="test-save" class="btn btn-secondary" type="button">Save Prompt</button>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------------- library -->
+      <section id="view-library" class="view" hidden>
+        <input id="library-search" class="search" type="search" placeholder="Search your prompts">
+        <p id="library-message" class="empty" hidden></p>
+        <ul id="library-list" class="library"></ul>
+      </section>
+
+      <!-- ---------------------------------------------------------- footer -->
+      <section class="account">
+        <div id="account-signed-out" hidden>
+          <button id="show-login" class="btn btn-ghost" type="button">Log in</button>
+          <form id="login-form" hidden>
+            <label class="field">
+              <span>Email</span>
+              <input id="login-email" type="email" autocomplete="username" required>
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input id="login-password" type="password" autocomplete="current-password" required>
+            </label>
+            <p id="login-error" class="login-error" role="alert" hidden></p>
+            <div class="row">
+              <button id="login-submit" class="btn btn-primary" type="submit">Log in</button>
+              <button id="login-cancel" class="btn btn-ghost" type="button">Cancel</button>
+            </div>
+            <p class="hint">Uses the same account as the Smart Prompt Generator web app.</p>
+          </form>
+        </div>
+
+        <div id="account-signed-in" class="signed-in" hidden>
+          <div class="account-info">
+            <span class="account-label">Signed in</span>
+            <span id="account-email" class="account-email"></span>
+          </div>
+          <button id="logout-btn" class="btn btn-ghost btn-small" type="button">Log out</button>
+        </div>
+      </section>
+
+      <details id="settings-block" class="settings">
+        <summary>Settings</summary>
+        <label class="field">
+          <span>API base URL</span>
+          <input id="api-base" type="url" spellcheck="false"
+                 placeholder="https://brollysolutions.in/prompt_generator/api">
+        </label>
+        <div class="row">
+          <button id="api-save" class="btn btn-secondary btn-small" type="button">Save</button>
+          <button id="api-reset" class="btn btn-ghost btn-small" type="button">Reset</button>
+        </div>
+        <p id="settings-status" class="hint" role="status"></p>
+      </details>
+
+      <p id="home-tip" class="tip">Tip: select text on any page, right-click, and choose <strong>Smart Prompt</strong>.</p>
     </main>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>
