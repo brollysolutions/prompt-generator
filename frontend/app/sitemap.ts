@@ -4,7 +4,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://brollysolutions.in"
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // Public, indexable routes only.
-  const routes = ["", "/generator", "/templates", "/community", "/login", "/signup"];
+  const routes = ["", "/generator", "/templates", "/community", "/login", "/signup", "/privacy"];
   return routes.map((path) => ({
     url: `${siteUrl}${path}`,
     changeFrequency: "weekly",
